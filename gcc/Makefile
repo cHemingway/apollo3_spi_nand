@@ -180,7 +180,6 @@ INCLUDES+= -I$(SDKPATH)/devices
 INCLUDES+= -I$(SDKPATH)/mcu/apollo3
 INCLUDES+= -I$(SDKPATH)/CMSIS/AmbiqMicro/Include
 INCLUDES+= -I$(SDKPATH)/CMSIS/ARM/Include
-INCLUDES+= -I$(OPUSPATH)/include
 INCLUDES+=
 
 # Compilation Units (Add all the .c files you need to compile)
