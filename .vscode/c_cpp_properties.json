@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "Baremetal",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceRoot}/../AmbiqSuite-Rel2.2.0",
+                "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/utils",
+                "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/devices",
+                "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/mcu/apollo3",
+                "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/CMSIS/AmbiqMicro/Include",
+                "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/CMSIS/ARM/Include",
+                "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/boards_sfe/edge/bsp"
+            ],
+            "defines": [
+                "AM_CUSTOM_BDADDR",
+                "AM_PACKAGE_BGA",
+                "WSF_TRACE_ENABLED",
+                "AM_DEBUG_PRINTF",
+                "AM_PART_APOLLO3",
+                "AM_UTIL_FAULTISR_PRINT"
+            ],
+            "compilerPath": "~/gcc-arm-none-eabi-7-2017-q4-major/bin/",
+            "cStandard": "c11",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "clang-x64"
+        }
+    ],
+    "version": 4
+}
