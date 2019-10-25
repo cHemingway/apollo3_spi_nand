@@ -29,6 +29,31 @@
                     "message": 5
                 }
             }
+        },
+        {
+            "label": "bootload",
+            "type": "shell",
+            "command": "make",
+            "args": ["bootload_asb"],
+            // use options.cwd property if the Makefile is not in the project root ${workspaceRoot} dir
+            "options": {
+                "cwd": "${workspaceRoot}/gcc"
+            },
+            "group": "none",
+            // Use the standard less compilation problem matcher.
+            "problemMatcher": {
+                "owner": "cpp",
+                // Set fileLocation to be relative to makefile location
+                "fileLocation": ["relative", "${workspaceRoot}/gcc"],
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            }
         }
     ]
 }
