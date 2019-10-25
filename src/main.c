@@ -1,0 +1,70 @@
+//! Compresses a predefined audio file (wav_data.c) using libopus
+//! Purpose: Determine if this can be done in "real time" within the 48MHz budget
+
+#include "am_mcu_apollo.h"
+#include "am_bsp.h"
+#include "am_util.h"
+#include "system_apollo3.h"
+
+
+#include "SEGGER_RTT.h"
+
+#define printf(...) SEGGER_RTT_printf(0, __VA_ARGS__)
+
+// External definitions
+extern void initialise_monitor_handles(void); // For semihosting
+extern int16_t wavdata[24000];         // wav_data.c
+
+
+// Override am_print_string so hard_fault_handler outputs over RTT
+void am_print_string(char *pcStr) {
+    SEGGER_RTT_WriteString(0, pcStr);
+}
+
+
+// Increment g_tick_ms every systick
+static volatile uint32_t g_tick_ms;  // Systick counter
+void SysTick_Handler(void)
+{
+    g_tick_ms++;
+}
+
+//*****************************************************************************
+// Main
+//*****************************************************************************
+int main(void)
+{
+
+    // Set the clock frequency, 48MHz, no turbo
+    am_hal_clkgen_control(AM_HAL_CLKGEN_CONTROL_SYSCLK_MAX, 0);
+
+    // Set the default cache configuration
+    am_hal_cachectrl_config(&am_hal_cachectrl_defaults);
+    am_hal_cachectrl_enable();
+
+    // Configure the board for low power operation.
+    am_bsp_low_power_init();
+
+    // Init RTT, printf() will be redirected to this
+    SEGGER_RTT_Init(); 
+
+    // Redirect AMBIQ Printf to RTT
+    am_util_stdio_printf_init(am_print_string);
+
+    // Enable interrupts.
+    am_hal_interrupt_master_enable();
+
+    SystemCoreClockUpdate();                //update clock variable SystemCoreClock (defined by CMSIS)
+    SysTick_Config(SystemCoreClock / 1000); //setup 1ms SysTick (defined by CMSIS)
+
+    printf("Hello World");                  // Outputs over Segger RTT
+
+    while(1) {
+        am_hal_gpio_state_write(AM_BSP_GPIO_LED_BLUE, AM_HAL_GPIO_OUTPUT_TOGGLE);
+        am_util_delay_ms(250);
+    }
+
+    // Go to Deep Sleep.
+    am_hal_sysctrl_sleep(AM_HAL_SYSCTRL_SLEEP_DEEP);
+    
+}
