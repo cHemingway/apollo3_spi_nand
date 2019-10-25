@@ -193,7 +193,7 @@ SRC+= am_util_stdio.c
 SRC+= system_apollo3.c
 SRC+= SEGGER_RTT.c
 SRC+= SEGGER_RTT_ASM_ARMv7M.S
-SRC+= SEGGER_RTT_printf.c
+SRC+= SEGGER_RTT_Syscalls_GCC.c
 SRC+=
 
 # VPATH (Add paths to where your source files are located)
@@ -289,7 +289,7 @@ LFLAGS = -mthumb -mcpu=$(CPU) -mfpu=$(FPU) -mfloat-abi=$(FABI)
 LFLAGS+= -nostartfiles -static
 LFLAGS+= -Wl,--gc-sections,--entry,Reset_Handler,-Map,$(CONFIG)/$(TARGET).map
 LFLAGS+= -Wl,--start-group -lm -lc -lgcc $(LIBS) -Wl,--end-group
-LFLAGS+= --specs=rdimon.specs --specs=nano.specs
+LFLAGS+= --specs=nosys.specs --specs=nano.specs
 LFLAGS+=
 
 # Additional user specified CFLAGS

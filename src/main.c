@@ -1,15 +1,15 @@
 // Template project for Ambiq Apollo 3, including Segger RTT and SysTick example
 // Flashes LED on Sparkfun Edge board
 
+// For printf, will pick up _write() in SEGGER_RTT_Syscalls_GCC.c
+#include <stdio.h>
+
 #include "am_mcu_apollo.h"
 #include "am_bsp.h"
 #include "am_util.h"
 #include "system_apollo3.h"
 
 #include "SEGGER_RTT.h"
-
-#define printf(...) SEGGER_RTT_printf(0, __VA_ARGS__)
-
 
 // Override am_print_string so hard_fault_handler outputs over RTT
 void am_print_string(char *pcStr) {
