@@ -1,19 +1,14 @@
-//! Compresses a predefined audio file (wav_data.c) using libopus
-//! Purpose: Determine if this can be done in "real time" within the 48MHz budget
+// Template project for Ambiq Apollo 3, including Segger RTT and SysTick example
+// Flashes LED on Sparkfun Edge board
 
 #include "am_mcu_apollo.h"
 #include "am_bsp.h"
 #include "am_util.h"
 #include "system_apollo3.h"
 
-
 #include "SEGGER_RTT.h"
 
 #define printf(...) SEGGER_RTT_printf(0, __VA_ARGS__)
-
-// External definitions
-extern void initialise_monitor_handles(void); // For semihosting
-extern int16_t wavdata[24000];         // wav_data.c
 
 
 // Override am_print_string so hard_fault_handler outputs over RTT
@@ -57,7 +52,7 @@ int main(void)
     SystemCoreClockUpdate();                //update clock variable SystemCoreClock (defined by CMSIS)
     SysTick_Config(SystemCoreClock / 1000); //setup 1ms SysTick (defined by CMSIS)
 
-    printf("Hello World");                  // Outputs over Segger RTT
+    printf("Hello World \n");                  // Outputs over Segger RTT
 
     while(1) {
         am_hal_gpio_state_write(AM_BSP_GPIO_LED_BLUE, AM_HAL_GPIO_OUTPUT_TOGGLE);
