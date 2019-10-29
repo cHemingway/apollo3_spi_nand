@@ -17,3 +17,6 @@ __pycache__
 
 # MacOSX
 *.DS_Store
+
+# Cortex-Debug
+.vscode/.cortex-debug.*.state.json

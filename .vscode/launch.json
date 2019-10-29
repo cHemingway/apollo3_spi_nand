@@ -1,0 +1,21 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Cortex Debug",
+            "cwd": "${workspaceRoot}/",
+            "executable": "./gcc/bin/executable_asb.axf",
+            "request": "launch",
+            "type": "cortex-debug",
+            "svdFile": "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/pack/SVD/apollo3.svd",
+            "servertype": "jlink",
+            "device": "AMA3B1KK-KBR",
+            "interface": "swd",         
+            "preLaunchTask": "make",    // In tasks.json
+            "runToMain": true // Needed to stop at main at beginning, or else very confusing
+        }
+    ]
+}

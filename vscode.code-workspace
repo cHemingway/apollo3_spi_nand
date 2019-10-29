@@ -4,5 +4,7 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"cortex-debug.JLinkGDBServerPath": "/mnt/c/Program Files (x86)/SEGGER/Jlink/JLinkGDBServerCL.exe"
+	}
 }

@@ -20,7 +20,7 @@
                 "AM_PART_APOLLO3",
                 "AM_UTIL_FAULTISR_PRINT"
             ],
-            "compilerPath": "~/gcc-arm-none-eabi-7-2017-q4-major/bin/",
+            "compilerPath": "/home/chris/gcc-arm-none-eabi-7-2017-q4-major/bin/",
             "cStandard": "c11",
             "cppStandard": "c++17",
             "intelliSenseMode": "clang-x64"
