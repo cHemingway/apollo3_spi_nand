@@ -93,9 +93,9 @@ BOARDPATH					?= # Set as the path to the board if not located at ../../..
 PROJECTPATH					?= # Set as the path to the project if not located at ../..
 
 ### Project Settings
-TARGET := opus_benchmark
+TARGET := executable
 COMPILERNAME := gcc
-PROJECT := opus_benchmark_gcc
+PROJECT := template
 CONFIG := bin
 
 
