@@ -98,6 +98,10 @@ COMPILERNAME := gcc
 PROJECT := template
 CONFIG := bin
 
+# 8KB Heap, 16KB Stack
+HEAP_SIZE := 0x2000
+STACK_SIZE := 0x4000
+
 
 #******************************************************************************
 #
@@ -290,6 +294,7 @@ LFLAGS+= -nostartfiles -static
 LFLAGS+= -Wl,--gc-sections,--entry,Reset_Handler,-Map,$(CONFIG)/$(TARGET).map
 LFLAGS+= -Wl,--start-group -lm -lc -lgcc $(LIBS) -Wl,--end-group
 LFLAGS+= --specs=nosys.specs --specs=nano.specs
+LFLAGS+= -Wl,--defsym=__MCU_heap_size=$(HEAP_SIZE),--defsym=__MCU_stack_size=$(STACK_SIZE)
 LFLAGS+=
 
 # Additional user specified CFLAGS
@@ -358,7 +363,9 @@ $(SDKPATH)/third_party/uecc/gcc/bin/lib_uecc.a:
 
 # 0xf0000 = 960K Flash, 0x60000 = 384K RAM
 print_size:
-	./get-fw-size.sh $(CONFIG)/$(TARGET)_asb.axf 0xf0000 0x60000
+	@echo "Heap size: $(shell printf "%d kB"  $$(( $(HEAP_SIZE) / 1024 )) )";
+	@echo "Stack size: $(shell printf "%d kB" $$(( $(STACK_SIZE) / 1024 )) )";
+	@./get-fw-size.sh $(CONFIG)/$(TARGET)_asb.axf 0xf0000 0x60000
 
 # Automatically include any generated dependencies
 -include $(DEPS)
