@@ -304,7 +304,7 @@ ODFLAGS = -S
 # Targets / Rules
 #
 #******************************************************************************
-all: directories $(CONFIG)/$(TARGET)_asb.bin
+all: directories $(CONFIG)/$(TARGET)_asb.bin print_size
 
 directories: $(CONFIG)
 
@@ -356,10 +356,12 @@ $(SDKPATH)/mcu/apollo3/hal/gcc/bin/libam_hal.a:
 $(SDKPATH)/third_party/uecc/gcc/bin/lib_uecc.a:
 	$(MAKE) -C $(SDKPATH)/third_party/uecc
 
-$(BOARDPATH)/bsp/gcc/bin/libam_bsp.a:
-	$(MAKE) -C $(BOARDPATH)/bsp/gcc
+# 0xf0000 = 960K Flash, 0x60000 = 384K RAM
+print_size:
+	./get-fw-size.sh $(CONFIG)/$(TARGET)_asb.axf 0xf0000 0x60000
 
 # Automatically include any generated dependencies
 -include $(DEPS)
 endif
-.PHONY: all clean directories bootload bootload_asb bootload_svl
+.PHONY: all clean directories bootload bootload_asb bootload_svl print_size
+
