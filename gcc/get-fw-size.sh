@@ -1,8 +1,7 @@
 #!/bin/bash
-
 # From https://interrupt.memfault.com/blog/best-firmware-size-tools
 
-if [  $# -le 2 ]
+if [ $# -le 2 ]
 then
     echo "This script requires 3 arguments."
     echo -e "\nUsage:\nget-fw-size FILE MAX_FLASH_SIZE MAX_RAM_SIZE \n"
