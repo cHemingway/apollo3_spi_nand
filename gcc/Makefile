@@ -142,7 +142,7 @@ export COMMONPATH
 endif
 
 ifeq ($(BOARDPATH),)
-    BOARDPATH			= $(SDKPATH)/boards_sfe/edge
+    BOARDPATH			= $(SDKPATH)/boards/apollo3_evb
     $(warning warning: you have not defined BOARDPATH so will continue assuming that the BOARD root is at $(BOARDPATH))
 else
 # When the BOARDPATH is given export it
@@ -171,6 +171,7 @@ DEFINES+= -DWSF_TRACE_ENABLED
 DEFINES+= -DAM_DEBUG_PRINTF
 DEFINES+= -DAM_PART_APOLLO3
 DEFINES+= -DAM_UTIL_FAULTISR_PRINT
+DEFINES+= -DMICRON_MT29F8G01AD
 DEFINES+=
 
 # Includes (Add paths to where example header files are located)
@@ -189,11 +190,14 @@ INCLUDES+=
 # Compilation Units (Add all the .c files you need to compile)
 SRC=
 SRC+= main.c
+SRC+= mspi_nand_flash.c
 SRC+= startup_apollo3.s
 SRC+= am_util_delay.c
 SRC+= am_util_faultisr.c
 SRC+= am_util_id.c
 SRC+= am_util_stdio.c
+SRC+= am_bsp.c
+SRC+= am_bsp_pins.c
 SRC+= system_apollo3.c
 SRC+= SEGGER_RTT.c
 SRC+= SEGGER_RTT_ASM_ARMv7M.S
@@ -206,6 +210,7 @@ VPATH+= $(PROJECTPATH)/src
 VPATH+= $(PROJECTPATH)/rtt
 VPATH+= $(SDKPATH)/utils
 VPATH+= $(SDKPATH)/CMSIS/AmbiqMicro/Source
+VPATH+= $(BOARDPATH)/bsp
 VPATH+=
 
 # LIBS (Precompiled libraries to include in the linker step)

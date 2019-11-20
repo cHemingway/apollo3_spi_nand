@@ -11,6 +11,8 @@
 
 #include "SEGGER_RTT.h"
 
+#include "mspi_nand_flash.h"
+
 // Override am_print_string so hard_fault_handler outputs over RTT
 void am_print_string(char *pcStr) {
     SEGGER_RTT_WriteString(0, pcStr);
@@ -29,6 +31,9 @@ void SysTick_Handler(void)
 //*****************************************************************************
 int main(void)
 {
+
+    uint32_t      retcode;
+    void          *pHandle = NULL;
 
     // Set the clock frequency, 48MHz, no turbo
     am_hal_clkgen_control(AM_HAL_CLKGEN_CONTROL_SYSCLK_MAX, 0);
@@ -54,8 +59,22 @@ int main(void)
 
     printf("Hello World \n");                  // Outputs over Segger RTT
 
+
+
     while(1) {
-        am_hal_gpio_state_write(AM_BSP_GPIO_LED_BLUE, AM_HAL_GPIO_OUTPUT_TOGGLE);
+        retcode = mspi_nand_flash_init(&pHandle);
+        if (AM_DEVICES_MSPI_FLASH_STATUS_SUCCESS != retcode)
+        {
+            printf("Failed to configure the MSPI and Flash Device correctly!\n");
+        }
+
+        retcode = mspi_nand_flash_id();
+        if (AM_DEVICES_MSPI_FLASH_STATUS_SUCCESS != retcode)
+        {
+            printf("Invalid Flash ID!\n");
+        }
+
+        am_hal_gpio_state_write(AM_BSP_GPIO_LED0, AM_HAL_GPIO_OUTPUT_TOGGLE);
         am_util_delay_ms(250);
     }
 
