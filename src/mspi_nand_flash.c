@@ -74,7 +74,7 @@ am_hal_mspi_dev_config_t  g_psMSPISettings =
     .eAddrCfg             = AM_HAL_MSPI_ADDR_2_BYTE, // TODO: How to map column address?
 
     .eInstrCfg            = AM_HAL_MSPI_INSTR_1_BYTE,       // One byte SPI
-    .eDeviceConfig        = AM_HAL_MSPI_FLASH_SERIAL_CE0,   // Single SPI
+    .eDeviceConfig        = AM_HAL_MSPI_FLASH_SERIAL_CE0,   // Single SPI, CS0
     .bSeparateIO          = true,                           // Seperate MOSI/MISO pins
     .bSendInstr           = true,                           // Send instruction
     .bSendAddr            = true,                           // Enable sending address
