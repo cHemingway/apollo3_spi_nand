@@ -59,23 +59,40 @@ int main(void)
 
     printf("Hello World \n");                  // Outputs over Segger RTT
 
+    // Init flash and check was OK
+    retcode = mspi_nand_flash_init(&pHandle);
+    if (AM_DEVICES_MSPI_FLASH_STATUS_SUCCESS != retcode)
+    {
+        printf("Failed to configure the MSPI and Flash Device correctly!\n");
+        am_hal_gpio_state_write(AM_BSP_GPIO_LED0, AM_HAL_GPIO_OUTPUT_SET);
+    }
 
+    // HACK: Set lower drive strength for clock to avoid ringing
+    // Ideally this should be within BSP
+    // Copy of g_AM_BSP_GPIO_MSPI_SCK with lower drive strength
+    {
+        am_hal_gpio_pincfg_t GPIO_MSPI_SCK = g_AM_BSP_GPIO_MSPI_SCK;
+        am_hal_gpio_pincfg_t GPIO_MSPI_D1 = g_AM_BSP_GPIO_MSPI_D1;
+        am_hal_gpio_pincfg_t GPIO_MSPI_CE0 = g_AM_BSP_GPIO_MSPI_CE0;
+        GPIO_MSPI_SCK.eDriveStrength = AM_HAL_GPIO_PIN_DRIVESTRENGTH_4MA; // Reduce 12 to 4
+        GPIO_MSPI_D1.eDriveStrength = AM_HAL_GPIO_PIN_DRIVESTRENGTH_4MA; // Reduce 8 to 4
+        GPIO_MSPI_CE0.eDriveStrength = AM_HAL_GPIO_PIN_DRIVESTRENGTH_4MA; // Reduce 12 to 4
+        am_hal_gpio_pinconfig(AM_BSP_GPIO_MSPI_SCK, GPIO_MSPI_SCK);
+        am_hal_gpio_pinconfig(AM_BSP_GPIO_MSPI_D1, GPIO_MSPI_D1);
+        am_hal_gpio_pinconfig(AM_BSP_GPIO_MSPI_CE0, GPIO_MSPI_CE0);
+    }
 
     while(1) {
-        retcode = mspi_nand_flash_init(&pHandle);
-        if (AM_DEVICES_MSPI_FLASH_STATUS_SUCCESS != retcode)
-        {
-            printf("Failed to configure the MSPI and Flash Device correctly!\n");
-        }
-
         retcode = mspi_nand_flash_id();
         if (AM_DEVICES_MSPI_FLASH_STATUS_SUCCESS != retcode)
         {
             printf("Invalid Flash ID!\n");
+            am_hal_gpio_state_write(AM_BSP_GPIO_LED3, AM_HAL_GPIO_OUTPUT_SET);
+        } else {
+            am_hal_gpio_state_write(AM_BSP_GPIO_LED3, AM_HAL_GPIO_OUTPUT_CLEAR);
         }
 
-        am_hal_gpio_state_write(AM_BSP_GPIO_LED0, AM_HAL_GPIO_OUTPUT_TOGGLE);
-        am_util_delay_ms(250);
+        am_util_delay_ms(100);
     }
 
     // Go to Deep Sleep.
