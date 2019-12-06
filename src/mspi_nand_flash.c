@@ -59,8 +59,9 @@
 #define CMD_READ_CACHE_QUADIO 0xEB
 #define CMD_PROGRAM_RANDOM_QUAD 0x34
 
-#define NAND_FLASH_ID       0x2c46
-#define NAND_FLASH_ID_MASK  0xfffe  // Allow both 0x2c46 (3.3V) and 0x2c47 (1.8V)
+// #define NAND_FLASH_ID       0x462c
+#define NAND_FLASH_ID       0x252c  // Byte reversed, LSB is first byte
+#define NAND_FLASH_ID_MASK  0xfeff  // Allow both 0x2c46 (3.3V) and 0x2c47 (1.8V)
 
 #define RESET_TIME_MS 1 // Takes 565uS to reset, round up to 1ms
 
@@ -341,9 +342,12 @@ uint32_t mspi_nand_flash_id(void)
 
     // Send device ID command, no address, and read 3 bytes (one dummy)
     ui32Status = am_device_command_read(ui32Module, CMD_READ_ID, false, 0, &ui32DeviceID, 3);
-    am_util_stdio_printf("Flash ID is %8.8X\n", ui32DeviceID);
+    // Shift out dummy byte
+    ui32DeviceID >>= 8;
+    // Debug print
+    am_util_stdio_printf("Flash READ_ID: 0x%4X\n", ui32DeviceID);
     
-    if ( ((ui32DeviceID & NAND_FLASH_ID_MASK) == NAND_FLASH_ID) &&
+    if ( ((ui32DeviceID & NAND_FLASH_ID_MASK) == (NAND_FLASH_ID & NAND_FLASH_ID_MASK)) &&
        (AM_HAL_STATUS_SUCCESS == ui32Status) )
     {
         return AM_DEVICES_MSPI_FLASH_STATUS_SUCCESS;
