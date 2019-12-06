@@ -59,6 +59,9 @@
 #define CMD_READ_CACHE_QUADIO 0xEB
 #define CMD_PROGRAM_RANDOM_QUAD 0x34
 
+#define CMD_GET_FEATURES 0x0F
+#define CMD_SET_FEATURES 0x1F
+
 // #define NAND_FLASH_ID       0x462c
 #define NAND_FLASH_ID       0x252c  // Byte reversed, LSB is first byte
 #define NAND_FLASH_ID_MASK  0xfeff  // Allow both 0x2c46 (3.3V) and 0x2c47 (1.8V)
@@ -356,4 +359,40 @@ uint32_t mspi_nand_flash_id(void)
     {
         return AM_DEVICES_MSPI_FLASH_STATUS_ERROR;
     }
+}
+
+/* Execute the GET_FEATURES command given a features address */
+uint32_t mspi_nand_get_features(uint8_t addr, uint8_t *data) {
+
+    uint32_t ui32Status;
+    uint32_t returned_data = 0;
+
+    // The GET_FEATURES command uses 1 byte addresses, unlike all others 
+    // HACK: Change the address size directly, rather than through HAL, as 
+    // using HAL requires us to reconfigure entire peripheral.
+    uint32_t mspi_cfg_old_asize = MSPI->CFG_b.ASIZE;
+    MSPI->CFG_b.ASIZE = 0x00;   // Address is 1 byte
+
+    // Create the individual write transaction.
+    g_PIOTransaction.eDirection         = AM_HAL_MSPI_RX;
+    g_PIOTransaction.bSendAddr          = true;    // Send address
+    g_PIOTransaction.ui32DeviceAddr     = addr;
+    g_PIOTransaction.bSendInstr         = true;     // Send instruction, 1 byte
+    g_PIOTransaction.ui16DeviceInstr    = CMD_GET_FEATURES;
+    g_PIOTransaction.bTurnaround        = false;
+    g_PIOTransaction.ui32NumBytes       = 1;        // 1 byte read
+    g_PIOTransaction.bQuadCmd           = false;    // SPI only, no quad or octal
+    g_PIOTransaction.pui32Buffer        = &returned_data;    // Read into buffer given
+
+    // Execute the transction over MSPI.
+    ui32Status = am_hal_mspi_blocking_transfer(g_pMSPIHandle, &g_PIOTransaction,
+                                         AM_DEVICES_MSPI_FLASH_TIMEOUT);
+
+    // Reset instruction size to original config
+    MSPI->CFG_b.ASIZE = mspi_cfg_old_asize;
+
+    // Convert recieved from uint32_t to uint8_t
+    *data = (uint8_t)(returned_data & 0xff);
+
+    return ui32Status;
 }

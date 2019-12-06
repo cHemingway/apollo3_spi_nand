@@ -22,6 +22,8 @@ uint32_t mspi_nand_flash_id(void);
 
 uint32_t mspi_nand_flash_reset(void);
 
+uint32_t mspi_nand_get_features(uint8_t addr, uint8_t *data);
+
 
 #endif // AM_DEVICES_MSPI_FLASH_H
 
