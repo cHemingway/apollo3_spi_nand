@@ -366,9 +366,8 @@ uint32_t mspi_nand_flash_id(void)
     ui32Status = am_device_command_read(ui32Module, CMD_READ_ID, false, 0, &ui32DeviceID, 3);
     // Shift out dummy byte
     ui32DeviceID >>= 8;
-    // Debug print
-    am_util_stdio_printf("Flash READ_ID: 0x%4X\n", ui32DeviceID);
     
+    // Check byte is valid
     if ( ((ui32DeviceID & NAND_FLASH_ID_MASK) == (NAND_FLASH_ID & NAND_FLASH_ID_MASK)) &&
        (AM_HAL_STATUS_SUCCESS == ui32Status) )
     {

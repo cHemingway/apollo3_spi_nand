@@ -83,7 +83,16 @@ int main(void)
     }
 
     while(1) {
-        mspi_nand_flash_test();
+        retcode = mspi_nand_flash_test();
+        if (retcode == AM_HAL_STATUS_SUCCESS) {
+            printf("FLASH TEST PASS \n");
+            am_hal_gpio_output_set(AM_BSP_GPIO_LED0);
+            am_hal_gpio_output_clear(AM_BSP_GPIO_LED3);
+        } else { // Error
+            printf("FLASH TEST FAIL \n");
+            am_hal_gpio_output_set(AM_BSP_GPIO_LED3);
+            am_hal_gpio_output_clear(AM_BSP_GPIO_LED0);
+        }
         
         am_util_delay_ms(100);
     }
