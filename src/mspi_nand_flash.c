@@ -69,7 +69,15 @@
 
 #define FEATURE_REG_BLOCK_LOCK 0xA0    // Block lock feature register
 #define FEATURE_REG_CONFIG     0xB0    // Config feature register
-#define FEATURE_REG_STATUS     0xC0    // Status register
+
+#define FEATURE_REG_STATUS     0xC0         // Status register
+#define FEATURE_REG_STATUSCACHE_READ_BUSY     0x07    // Mask for Cache Read Busy (CRBSY)
+// TODO: ECC Status bits 0:2
+#define FEATURE_REG_STATUS_P_FAIL_MASK  0x04    // Mask for program failure
+#define FEATURE_REG_STATUS_E_FAIL_MASK  0x04    // Mask for erase failure
+#define FEATURE_REG_STATUS_WEL_MASK     0x02    // Mask for Write Enable Latch (WEL) bit. 1=Writable
+#define FEATURE_REG_STATUS_OIP_MASK     0x01    // Mask for Operation In Progress (OIP) bit. 1=Busy
+
 #define FEATURE_REG_DIE_SELECT 0xD0    // Die select register
 
 // #define NAND_FLASH_ID       0x462c
@@ -429,21 +437,57 @@ uint32_t mspi_nand_flash_write_disable(void) {
     return ui32Status;
 }
 
-uint32_t mspi_nand_flash_test(void) {
 
+uint32_t mspi_nand_flash_get_writable(bool *writable) {
+    uint32_t    ui32Status;
+    uint8_t    status_reg;
+
+    // Get the status register
+    ui32Status = mspi_nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) { // Exit early on error
+        return ui32Status;
+    }
+
+    if (status_reg & FEATURE_REG_STATUS_WEL_MASK) {
+        *writable = true;
+    } else {
+        *writable = false;
+    }
+
+    return ui32Status;
+}
+
+
+
+uint32_t mspi_nand_flash_test(void) {
+    bool writable = false; // For get_writable();
+
+    // Quick test macros. TODO: Use a proper framework from someone else!
     #define STRINGIFY(x) #x
     #define TOSTRING(x) STRINGIFY(x)
     #define RET_CHECK(cmd) if(cmd != AM_HAL_STATUS_SUCCESS) {am_util_stdio_printf("Flash TEST: " STRINGIFY(cmd) " returned error \n"); return 1;}
 
 
+    // Check for valid flash ID
     RET_CHECK(mspi_nand_flash_id());
 
+    // Enable write and check if writable status is correct
     RET_CHECK(mspi_nand_flash_write_enable());
-    // TODO: Check status register of flash to see if write was enabled
+    RET_CHECK(mspi_nand_flash_get_writable(&writable));
+    if (writable == false) {
+        am_util_stdio_printf("Flash TEST: Writable status was not enabled! \n");
+        return 1;
+    }
+    // Enable write and check if writable status is correct
     RET_CHECK(mspi_nand_flash_write_disable());
+    RET_CHECK(mspi_nand_flash_get_writable(&writable));
+    if (writable == true) {
+        am_util_stdio_printf("Flash TEST: Writable status was not disabled! \n");
+        return 1;
+    }
     
 
-    // TODO: get_features
+    // TODO: get_features, done partly via get_writable 
 
 
     #undef RET_CHECK

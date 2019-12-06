@@ -26,6 +26,8 @@ uint32_t mspi_nand_flash_write_enable(void);
 
 uint32_t mspi_nand_flash_write_disable(void);
 
+uint32_t mspi_nand_flash_get_writable(bool *writable);
+
 
 /* After init, run this to test all features */
 uint32_t mspi_nand_flash_test(void);
