@@ -51,9 +51,14 @@
 
 #if defined(MICRON_MT29F8G01AD)
 
+#define CMD_RESET 0xFF
+
+#define CMD_WRITE_ENABLE        0x06
+#define CMD_WRITE_DISABLE       0x04
+
 #define CMD_READ_CACHE_SINGLE 0x03
 #define CMD_PROGRAM_RANDOM_SINGLE 0x84
-#define CMD_RESET 0xFF
+
 #define CMD_READ_ID 0x9f
 
 #define CMD_READ_CACHE_QUADIO 0xEB
@@ -61,6 +66,11 @@
 
 #define CMD_GET_FEATURES 0x0F
 #define CMD_SET_FEATURES 0x1F
+
+#define FEATURE_REG_BLOCK_LOCK 0xA0    // Block lock feature register
+#define FEATURE_REG_CONFIG     0xB0    // Config feature register
+#define FEATURE_REG_STATUS     0xC0    // Status register
+#define FEATURE_REG_DIE_SELECT 0xD0    // Die select register
 
 // #define NAND_FLASH_ID       0x462c
 #define NAND_FLASH_ID       0x252c  // Byte reversed, LSB is first byte
@@ -91,7 +101,8 @@ am_hal_mspi_dev_config_t  g_psMSPISettings =
     .scramblingStartAddr  = 0,                              // No data scrambling
     .scramblingEndAddr    = 0,
 };
-#else
+
+#else // Not defined flash ID
 #error "No Flash defined!"
 #endif
 
@@ -361,8 +372,11 @@ uint32_t mspi_nand_flash_id(void)
     }
 }
 
-/* Execute the GET_FEATURES command given a features address */
-uint32_t mspi_nand_get_features(uint8_t addr, uint8_t *data) {
+/* 
+ * Execute the GET_FEATURES command given a register address addr, to get the byte data
+ * Not part of public API, as higher level functions (e.g. get status) should be used
+ */
+static uint32_t mspi_nand_cmd_get_features(uint8_t addr, uint8_t *data) {
 
     uint32_t ui32Status;
     uint32_t returned_data = 0;
@@ -395,4 +409,44 @@ uint32_t mspi_nand_get_features(uint8_t addr, uint8_t *data) {
     *data = (uint8_t)(returned_data & 0xff);
 
     return ui32Status;
+}
+
+
+uint32_t mspi_nand_flash_write_enable(void) {
+    uint32_t      ui32Status;
+
+    // Send write_enable command, no address, no data
+    ui32Status = am_device_command_write(ui32Module, CMD_WRITE_ENABLE, false, 0, NULL, 0);
+    return ui32Status;
+}
+
+
+uint32_t mspi_nand_flash_write_disable(void) {
+    uint32_t      ui32Status;
+
+    // Send write_enable command, no address, no data
+    ui32Status = am_device_command_write(ui32Module, CMD_WRITE_DISABLE, false, 0, NULL, 0);
+    return ui32Status;
+}
+
+uint32_t mspi_nand_flash_test(void) {
+
+    #define STRINGIFY(x) #x
+    #define TOSTRING(x) STRINGIFY(x)
+    #define RET_CHECK(cmd) if(cmd != AM_HAL_STATUS_SUCCESS) {am_util_stdio_printf("Flash TEST: " STRINGIFY(cmd) " returned error \n"); return 1;}
+
+
+    RET_CHECK(mspi_nand_flash_id());
+
+    RET_CHECK(mspi_nand_flash_write_enable());
+    // TODO: Check status register of flash to see if write was enabled
+    RET_CHECK(mspi_nand_flash_write_disable());
+    
+
+    // TODO: get_features
+
+
+    #undef RET_CHECK
+    #undef TOSTRING
+    #undef STRINGIFY 
 }

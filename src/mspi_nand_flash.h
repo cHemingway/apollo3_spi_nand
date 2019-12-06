@@ -22,7 +22,13 @@ uint32_t mspi_nand_flash_id(void);
 
 uint32_t mspi_nand_flash_reset(void);
 
-uint32_t mspi_nand_get_features(uint8_t addr, uint8_t *data);
+uint32_t mspi_nand_flash_write_enable(void);
+
+uint32_t mspi_nand_flash_write_disable(void);
+
+
+/* After init, run this to test all features */
+uint32_t mspi_nand_flash_test(void);
 
 
 #endif // AM_DEVICES_MSPI_FLASH_H

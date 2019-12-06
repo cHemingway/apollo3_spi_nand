@@ -83,15 +83,8 @@ int main(void)
     }
 
     while(1) {
-        retcode = mspi_nand_flash_id();
-        if (AM_DEVICES_MSPI_FLASH_STATUS_SUCCESS != retcode)
-        {
-            printf("Invalid Flash ID!\n");
-            am_hal_gpio_state_write(AM_BSP_GPIO_LED3, AM_HAL_GPIO_OUTPUT_SET);
-        } else {
-            am_hal_gpio_state_write(AM_BSP_GPIO_LED3, AM_HAL_GPIO_OUTPUT_CLEAR);
-        }
-
+        mspi_nand_flash_test();
+        
         am_util_delay_ms(100);
     }
 
