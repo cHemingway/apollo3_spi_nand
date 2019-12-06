@@ -1,5 +1,5 @@
 /*
- * mspi_nand_flash.h, 
+ * mspi_nand_flash.h
  * Chris Hemingway 2019
  */
 
@@ -16,21 +16,21 @@ typedef enum
 } am_devices_mspi_flash_status_t;
 
 
-uint32_t mspi_nand_flash_init(void **pHandle);
+uint32_t mspi_nand_init(void **pHandle);
 
-uint32_t mspi_nand_flash_id(void);
+uint32_t mspi_nand_id(void);
 
-uint32_t mspi_nand_flash_reset(void);
+uint32_t mspi_nand_reset(void);
 
-uint32_t mspi_nand_flash_write_enable(void);
+uint32_t mspi_nand_write_enable(void);
 
-uint32_t mspi_nand_flash_write_disable(void);
+uint32_t mspi_nand_write_disable(void);
 
-uint32_t mspi_nand_flash_get_writable(bool *writable);
+uint32_t mspi_nand_get_writable(bool *writable);
 
 
 /* After init, run this to test all features */
-uint32_t mspi_nand_flash_test(void);
+uint32_t mspi_nand_test(void);
 
 
 #endif // AM_DEVICES_MSPI_FLASH_H

@@ -60,7 +60,7 @@ int main(void)
     printf("Hello World \n");                  // Outputs over Segger RTT
 
     // Init flash and check was OK
-    retcode = mspi_nand_flash_init(&pHandle);
+    retcode = mspi_nand_init(&pHandle);
     if (AM_DEVICES_MSPI_FLASH_STATUS_SUCCESS != retcode)
     {
         printf("Failed to configure the MSPI and Flash Device correctly!\n");
@@ -83,7 +83,7 @@ int main(void)
     }
 
     while(1) {
-        retcode = mspi_nand_flash_test();
+        retcode = mspi_nand_test();
         if (retcode == AM_HAL_STATUS_SUCCESS) {
             printf("FLASH TEST PASS \n");
             am_hal_gpio_output_set(AM_BSP_GPIO_LED0);

@@ -1,12 +1,12 @@
 /*
- * mspi_nand_flash.h
+ * mspi_nand.h
  * Driver for QuadSPI NAND Flash using CE0
  * Chris Hemingway, 2019
  */
 
 //*****************************************************************************
 //
-// Functions mspi_nand_flash_init, am_device_command_write, am_device_command_read 
+// Functions mspi_nand_init, am_device_command_write, am_device_command_read 
 // Copyright (c) 2019, Ambiq Micro
 // All rights reserved.
 // 
@@ -80,9 +80,9 @@
 
 #define FEATURE_REG_DIE_SELECT 0xD0    // Die select register
 
-// #define NAND_FLASH_ID       0x462c
-#define NAND_FLASH_ID       0x252c  // Byte reversed, LSB is first byte
-#define NAND_FLASH_ID_MASK  0xfeff  // Allow both 0x2c46 (3.3V) and 0x2c47 (1.8V)
+// #define nand_ID       0x462c
+#define nand_ID       0x252c  // Byte reversed, LSB is first byte
+#define nand_ID_MASK  0xfeff  // Allow both 0x2c46 (3.3V) and 0x2c47 (1.8V)
 
 #define RESET_TIME_MS 1 // Takes 565uS to reset, round up to 1ms
 
@@ -223,7 +223,7 @@ uint32_t am_device_command_read(uint32_t ui32Module, uint8_t ui8Instr, bool bSen
 
 
 
-uint32_t mspi_nand_flash_reset(void)
+uint32_t mspi_nand_reset(void)
 {
 
   if (AM_HAL_STATUS_SUCCESS != am_device_command_write(ui32Module, CMD_RESET, false, 0, g_PIOBuffer, 0))
@@ -237,7 +237,7 @@ uint32_t mspi_nand_flash_reset(void)
 
 
 
-uint32_t mspi_nand_flash_init(void **pHandle)
+uint32_t mspi_nand_init(void **pHandle)
 {
     uint32_t      ui32Status;
 
@@ -279,7 +279,7 @@ uint32_t mspi_nand_flash_init(void **pHandle)
         
 
 
-    if (AM_HAL_STATUS_SUCCESS != mspi_nand_flash_reset())
+    if (AM_HAL_STATUS_SUCCESS != mspi_nand_reset())
     {
         return AM_DEVICES_MSPI_FLASH_STATUS_ERROR;
     }
@@ -357,7 +357,7 @@ uint32_t mspi_nand_flash_init(void **pHandle)
     return AM_DEVICES_MSPI_FLASH_STATUS_SUCCESS;
 }
 
-uint32_t mspi_nand_flash_id(void)
+uint32_t mspi_nand_id(void)
 {
     uint32_t      ui32Status;
     uint32_t      ui32DeviceID;
@@ -368,7 +368,7 @@ uint32_t mspi_nand_flash_id(void)
     ui32DeviceID >>= 8;
     
     // Check byte is valid
-    if ( ((ui32DeviceID & NAND_FLASH_ID_MASK) == (NAND_FLASH_ID & NAND_FLASH_ID_MASK)) &&
+    if ( ((ui32DeviceID & nand_ID_MASK) == (nand_ID & nand_ID_MASK)) &&
        (AM_HAL_STATUS_SUCCESS == ui32Status) )
     {
         return AM_DEVICES_MSPI_FLASH_STATUS_SUCCESS;
@@ -419,7 +419,7 @@ static uint32_t mspi_nand_cmd_get_features(uint8_t addr, uint8_t *data) {
 }
 
 
-uint32_t mspi_nand_flash_write_enable(void) {
+uint32_t mspi_nand_write_enable(void) {
     uint32_t      ui32Status;
 
     // Send write_enable command, no address, no data
@@ -428,7 +428,7 @@ uint32_t mspi_nand_flash_write_enable(void) {
 }
 
 
-uint32_t mspi_nand_flash_write_disable(void) {
+uint32_t mspi_nand_write_disable(void) {
     uint32_t      ui32Status;
 
     // Send write_enable command, no address, no data
@@ -437,7 +437,7 @@ uint32_t mspi_nand_flash_write_disable(void) {
 }
 
 
-uint32_t mspi_nand_flash_get_writable(bool *writable) {
+uint32_t mspi_nand_get_writable(bool *writable) {
     uint32_t    ui32Status;
     uint8_t    status_reg;
 
@@ -458,7 +458,7 @@ uint32_t mspi_nand_flash_get_writable(bool *writable) {
 
 
 
-uint32_t mspi_nand_flash_test(void) {
+uint32_t mspi_nand_test(void) {
     bool writable = false; // For get_writable();
 
     // Quick test macros. TODO: Use a proper framework from someone else!
@@ -468,18 +468,18 @@ uint32_t mspi_nand_flash_test(void) {
 
 
     // Check for valid flash ID
-    RET_CHECK(mspi_nand_flash_id());
+    RET_CHECK(mspi_nand_id());
 
     // Enable write and check if writable status is correct
-    RET_CHECK(mspi_nand_flash_write_enable());
-    RET_CHECK(mspi_nand_flash_get_writable(&writable));
+    RET_CHECK(mspi_nand_write_enable());
+    RET_CHECK(mspi_nand_get_writable(&writable));
     if (writable == false) {
         am_util_stdio_printf("Flash TEST: Writable status was not enabled! \n");
         return 1;
     }
     // Enable write and check if writable status is correct
-    RET_CHECK(mspi_nand_flash_write_disable());
-    RET_CHECK(mspi_nand_flash_get_writable(&writable));
+    RET_CHECK(mspi_nand_write_disable());
+    RET_CHECK(mspi_nand_get_writable(&writable));
     if (writable == true) {
         am_util_stdio_printf("Flash TEST: Writable status was not disabled! \n");
         return 1;
