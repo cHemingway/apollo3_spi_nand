@@ -20,6 +20,8 @@ uint32_t mspi_nand_flash_init(void **pHandle);
 
 uint32_t mspi_nand_flash_id(void);
 
+uint32_t mspi_nand_flash_reset(void);
+
 
 #endif // AM_DEVICES_MSPI_FLASH_H
 

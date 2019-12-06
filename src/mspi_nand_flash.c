@@ -200,7 +200,7 @@ uint32_t am_device_command_read(uint32_t ui32Module, uint8_t ui8Instr, bool bSen
 
 
 
-uint32_t mspi_nand_flash_reset(uint32_t ui32Module)
+uint32_t mspi_nand_flash_reset(void)
 {
 
   if (AM_HAL_STATUS_SUCCESS != am_device_command_write(ui32Module, CMD_RESET, false, 0, g_PIOBuffer, 0))
@@ -256,7 +256,7 @@ uint32_t mspi_nand_flash_init(void **pHandle)
         
 
 
-    if (AM_HAL_STATUS_SUCCESS != mspi_nand_flash_reset(ui32Module))
+    if (AM_HAL_STATUS_SUCCESS != mspi_nand_flash_reset())
     {
         return AM_DEVICES_MSPI_FLASH_STATUS_ERROR;
     }
