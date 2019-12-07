@@ -87,6 +87,7 @@
 
 #define RESET_TIME_MS 1 // Takes 565uS to reset, round up to 1ms
 
+#define PAGE_SIZE   (128+(2*1024))  // Page is 128 Metadata/ECC + 2K Data
 // NAND Flash device configuration structure
 am_hal_mspi_dev_config_t  g_psMSPISettings =
 {
@@ -118,12 +119,15 @@ am_hal_mspi_dev_config_t  g_psMSPISettings =
 // Pointer to MSPI peripheral
 void                            *g_pMSPIHandle;   
 
-
-// Transaction state and buffer
+// Transaction state
 am_hal_mspi_pio_transfer_t      g_PIOTransaction;
-uint32_t                        g_PIOBuffer[32];
 
-const uint32_t ui32Module = 0;
+// Buffer for entire page read/write test
+// Align for DMA to word size, TODO: Is this needed?
+uint8_t                         page_buffer[PAGE_SIZE] __attribute__((aligned(4)));
+
+
+const uint32_t ui32Module = 0; // Index of MSPI module. Apollo3 only has MSPI0
 
 //*****************************************************************************
 //
@@ -227,7 +231,7 @@ uint32_t am_device_command_read(uint32_t ui32Module, uint8_t ui8Instr, bool bSen
 uint32_t mspi_nand_reset(void)
 {
 
-  if (AM_HAL_STATUS_SUCCESS != am_device_command_write(ui32Module, CMD_RESET, false, 0, g_PIOBuffer, 0))
+  if (AM_HAL_STATUS_SUCCESS != am_device_command_write(ui32Module, CMD_RESET, false, 0, NULL, 0))
   {
     return AM_DEVICES_MSPI_FLASH_STATUS_ERROR;
   }
@@ -484,13 +488,26 @@ uint32_t mspi_nand_get_busy(bool *busy) {
 static uint32_t mspi_nand_cmd_page_read(uint32_t page_addr) {
     uint32_t ui32Status;
 
-    // Read old size
-    uint32_t mspi_cfg_old_asize = MSPI->CFG_b.ASIZE;
+    // Change to 3 byte addresses 
     MSPI->CFG_b.ASIZE = 0x02;   // Address is 3 bytes
-
     ui32Status = am_device_command_write(ui32Module, CMD_PAGE_READ, true, page_addr, NULL, 0);
+    return ui32Status;
+}
 
-    MSPI->CFG_b.ASIZE = mspi_cfg_old_asize;
+
+/* 
+ * Execute READ FROM CACHE x1 to read single page into Cache
+ */
+static uint32_t mspi_nand_cmd_read_x1(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
+    uint32_t ui32Status;
+
+    // Change to 2 byte addresses
+    MSPI->CFG_b.ASIZE = 0x02;   // Address is 2 bytes
+
+    // Set 8 bit turnaround
+    MSPI->CFG_b.TURNAROUND = 8;
+
+    ui32Status = am_device_command_read(ui32Module, CMD_READ_CACHE_SINGLE, true, column_addr, data , data_len);
 
     return ui32Status;
 }
@@ -524,7 +541,7 @@ uint32_t mspi_nand_test(void) {
     }
     
 
-    // Test reading a page
+    // Test reading a page into cache
     // Should be immediately busy, then not busy after tRead
     // TODO: Check ECC?
     RET_CHECK(mspi_nand_cmd_page_read(0xa5)); // Read block a5 = 165, chosen for pattern
@@ -540,10 +557,13 @@ uint32_t mspi_nand_test(void) {
         return 1;
     }
 
-    // TODO: get_features, done partly via get_writable 
+    // Read page from cache using x1 interface
+    RET_CHECK(mspi_nand_cmd_read_x1(0x00, (uint32_t *)page_buffer, PAGE_SIZE));
 
 
     #undef RET_CHECK
     #undef TOSTRING
     #undef STRINGIFY 
+
+    return AM_HAL_STATUS_SUCCESS;
 }
