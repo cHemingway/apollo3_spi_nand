@@ -98,9 +98,9 @@ COMPILERNAME := gcc
 PROJECT := template
 CONFIG := bin
 
-# 8KB Heap, 16KB Stack
+# 8KB Heap, 32KB Stack
 HEAP_SIZE := 0x2000
-STACK_SIZE := 0x4000
+STACK_SIZE := 0x8000
 
 
 #******************************************************************************

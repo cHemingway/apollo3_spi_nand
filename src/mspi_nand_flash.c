@@ -69,7 +69,11 @@
 #define CMD_SET_FEATURES 0x1F
 
 #define FEATURE_REG_BLOCK_LOCK 0xA0    // Block lock feature register
-#define FEATURE_REG_CONFIG     0xB0    // Config feature register
+
+#define FEATURE_REG_CONFIG     0xB0                      // Config feature register
+#define FEATURE_REG_CONFIG_CFG_MASK                 0xC1 // Config register CFG bits mask
+#define FEATURE_REG_CONFIG_CFG_VALUE_READ_PARAMS    0x40 // Config:CFG value for read parameter page
+
 
 #define FEATURE_REG_STATUS     0xC0         // Status register
 #define FEATURE_REG_STATUSCACHE_READ_BUSY     0x07    // Mask for Cache Read Busy (CRBSY)
@@ -88,6 +92,11 @@
 #define RESET_TIME_MS 1 // Takes 565uS to reset, round up to 1ms
 
 #define PAGE_SIZE   (128+(2*1024))  // Page is 128 Metadata/ECC + 2K Data
+
+#define PARAMETER_PAGE_SIZE 256        // Parameter page is 255 bytes, repeats up to PAGE_SIZE
+#define PARAMETER_PAGE_PAGE_ADDR 0x01  // Parameter table is page 0x01 (only in OTP/Param access mode)
+#define PARAMETER_PAGE_COLUMN_ADDR 0x00 // Parameter table starts at column 0x00
+
 // NAND Flash device configuration structure
 am_hal_mspi_dev_config_t  g_psMSPISettings =
 {
@@ -424,6 +433,43 @@ static uint32_t mspi_nand_cmd_get_features(uint8_t addr, uint8_t *data) {
 }
 
 
+/* 
+ * Execute the SET_FEATURES command given a register address addr, to get the byte data
+ * Not part of public API, as higher level functions (e.g. get status) should be used
+ */
+static uint32_t mspi_nand_cmd_set_features(uint8_t addr, uint8_t data) {
+
+    uint32_t ui32Status;
+    uint32_t data32 = data;
+
+    // The GET_FEATURES command uses 1 byte addresses, unlike all others 
+    // HACK: Change the address size directly, rather than through HAL, as 
+    // using HAL requires us to reconfigure entire peripheral.
+    uint32_t mspi_cfg_old_asize = MSPI->CFG_b.ASIZE;
+    MSPI->CFG_b.ASIZE = 0x00;   // Address is 1 byte
+
+    // Create the individual write transaction.
+    g_PIOTransaction.eDirection         = AM_HAL_MSPI_TX;
+    g_PIOTransaction.bSendAddr          = true;    // Send address
+    g_PIOTransaction.ui32DeviceAddr     = addr;
+    g_PIOTransaction.bSendInstr         = true;     // Send instruction, 1 byte
+    g_PIOTransaction.ui16DeviceInstr    = CMD_SET_FEATURES;
+    g_PIOTransaction.bTurnaround        = false;
+    g_PIOTransaction.ui32NumBytes       = 1;        // 1 byte write
+    g_PIOTransaction.bQuadCmd           = false;    // SPI only, no quad or octal
+    g_PIOTransaction.pui32Buffer        = &data32;    // Write 32 bit data
+
+    // Execute the transction over MSPI.
+    ui32Status = am_hal_mspi_blocking_transfer(g_pMSPIHandle, &g_PIOTransaction,
+                                         AM_DEVICES_MSPI_FLASH_TIMEOUT);
+
+    // Reset instruction size to original config
+    MSPI->CFG_b.ASIZE = mspi_cfg_old_asize;
+
+    return ui32Status;
+}
+
+
 uint32_t mspi_nand_write_enable(void) {
     uint32_t      ui32Status;
 
@@ -512,9 +558,55 @@ static uint32_t mspi_nand_cmd_read_x1(uint16_t column_addr, uint32_t *data, uint
     return ui32Status;
 }
 
+/*
+ * Read the parameter page (blocking) from the flash into *params_page of size len
+ * Len must be > PARAMETER_PAGE_SIZE
+ */
+uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len) {
+    uint32_t ui32Status;
+    uint8_t  reg_config, old_reg_config;
+    bool busy = true;
+
+    // Check length parameter
+    if (len < PARAMETER_PAGE_SIZE) {
+        return AM_HAL_STATUS_INVALID_ARG;
+    }
+
+    // Modify CFG bits of Feature register Configuration (0xB0) to get params page
+    ui32Status = mspi_nand_cmd_get_features(FEATURE_REG_CONFIG, &old_reg_config);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+
+    reg_config = old_reg_config & ~FEATURE_REG_CONFIG_CFG_MASK; // Clear CFG bits
+    reg_config |= FEATURE_REG_CONFIG_CFG_VALUE_READ_PARAMS;     // Set CFG to VALUE_READ_PARAMS, 010
+
+    mspi_nand_cmd_set_features(FEATURE_REG_CONFIG, reg_config);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+
+    // Read params page into cache
+    ui32Status = mspi_nand_cmd_page_read(PARAMETER_PAGE_PAGE_ADDR);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+
+    // Spin until completed
+    while(busy) {
+        ui32Status = mspi_nand_get_busy(&busy);
+        if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    }
+
+    // Read out params page from cache
+    ui32Status = mspi_nand_cmd_read_x1(PARAMETER_PAGE_COLUMN_ADDR, (uint32_t *)params_page, len);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+
+    // Write original value back to old_reg_config to exit parameter page reading mode
+    mspi_nand_cmd_set_features(FEATURE_REG_CONFIG, old_reg_config);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+
+    return AM_HAL_STATUS_SUCCESS; // Return success
+}
+
 
 uint32_t mspi_nand_test(void) {
     bool writable = false, busy = false; // For get_writable();
+    uint8_t params_page[PARAMETER_PAGE_SIZE];
 
     // Quick test macros. TODO: Use a proper framework from someone else!
     #define STRINGIFY(x) #x
@@ -559,6 +651,10 @@ uint32_t mspi_nand_test(void) {
 
     // Read page from cache using x1 interface
     RET_CHECK(mspi_nand_cmd_read_x1(0x00, (uint32_t *)page_buffer, PAGE_SIZE));
+
+
+    // Read params page
+    RET_CHECK(mspi_nand_read_params_page(params_page, PARAMETER_PAGE_SIZE));
 
 
     #undef RET_CHECK
