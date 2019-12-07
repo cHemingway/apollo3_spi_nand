@@ -44,6 +44,8 @@
 #include <string.h> // memcmp
 
 #include "mspi_nand_flash.h"
+#include "onfi_print.h"
+
 #include "am_util_stdio.h"
 #include "am_util_delay.h"
 #include "am_bsp.h"
@@ -786,6 +788,9 @@ uint32_t mspi_nand_test(void) {
 
     // Read params page using SPI
     RET_CHECK(mspi_nand_read_params_page(params_page, PARAMETER_PAGE_SIZE, false));
+
+    // Print out parameters page without details for debugging
+    RET_CHECK(onfi_print(params_page, PARAMETER_PAGE_SIZE, false));
 
     // Read params page using Quad IO
     RET_CHECK(mspi_nand_read_params_page(quad_params_page, PARAMETER_PAGE_SIZE, true));

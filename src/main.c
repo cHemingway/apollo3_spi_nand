@@ -57,7 +57,7 @@ int main(void)
     SystemCoreClockUpdate();                //update clock variable SystemCoreClock (defined by CMSIS)
     SysTick_Config(SystemCoreClock / 1000); //setup 1ms SysTick (defined by CMSIS)
 
-    printf("Hello World \n");                  // Outputs over Segger RTT
+    printf("Starting Flash Tests \n");                  // Outputs over Segger RTT
 
     // Init flash and check was OK
     retcode = mspi_nand_init(&pHandle);
@@ -85,16 +85,16 @@ int main(void)
     while(1) {
         retcode = mspi_nand_test();
         if (retcode == AM_HAL_STATUS_SUCCESS) {
-            printf("FLASH TEST PASS \n");
+            printf("FLASH TEST PASS \n\n");
             am_hal_gpio_output_set(AM_BSP_GPIO_LED0);
             am_hal_gpio_output_clear(AM_BSP_GPIO_LED3);
         } else { // Error
-            printf("FLASH TEST FAIL \n");
+            printf("FLASH TEST FAIL \n\n");
             am_hal_gpio_output_set(AM_BSP_GPIO_LED3);
             am_hal_gpio_output_clear(AM_BSP_GPIO_LED0);
         }
         
-        am_util_delay_ms(100);
+        am_util_delay_ms(1000);
     }
 
     // Go to Deep Sleep.
