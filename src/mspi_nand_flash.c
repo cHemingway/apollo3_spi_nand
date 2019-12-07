@@ -56,7 +56,8 @@
 #define CMD_WRITE_ENABLE        0x06
 #define CMD_WRITE_DISABLE       0x04
 
-#define CMD_READ_CACHE_SINGLE 0x03
+#define CMD_PAGE_READ           0x13
+#define CMD_READ_CACHE_SINGLE   0x03
 #define CMD_PROGRAM_RANDOM_SINGLE 0x84
 
 #define CMD_READ_ID 0x9f
@@ -457,9 +458,46 @@ uint32_t mspi_nand_get_writable(bool *writable) {
 }
 
 
+uint32_t mspi_nand_get_busy(bool *busy) {
+    uint32_t    ui32Status;
+    uint8_t    status_reg;
+
+    // Get the status register
+    ui32Status = mspi_nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) { // Exit early on error
+        return ui32Status;
+    }
+
+    if (status_reg & FEATURE_REG_STATUS_OIP_MASK) {
+        *busy = true;
+    } else {
+        *busy = false;
+    }
+
+    return ui32Status;
+}
+
+
+/* 
+ * Execute PAGE_READ command to read a page into the cache given column address
+ */
+static uint32_t mspi_nand_cmd_page_read(uint32_t column_addr) {
+    uint32_t ui32Status;
+
+    // Read old size
+    uint32_t mspi_cfg_old_asize = MSPI->CFG_b.ASIZE;
+    MSPI->CFG_b.ASIZE = 0x02;   // Address is 3 bytes
+
+    ui32Status = am_device_command_write(ui32Module, CMD_PAGE_READ, true, column_addr, NULL, 0);
+
+    MSPI->CFG_b.ASIZE = mspi_cfg_old_asize;
+
+    return ui32Status;
+}
+
 
 uint32_t mspi_nand_test(void) {
-    bool writable = false; // For get_writable();
+    bool writable = false, busy = false; // For get_writable();
 
     // Quick test macros. TODO: Use a proper framework from someone else!
     #define STRINGIFY(x) #x
@@ -485,6 +523,22 @@ uint32_t mspi_nand_test(void) {
         return 1;
     }
     
+
+    // Test reading a page, choose page 0
+    // Should be immediately busy, then not busy after tRead
+    // TODO: Check ECC?
+    RET_CHECK(mspi_nand_cmd_page_read(0xa5)); // Read Page a5 = 165, chosen for pattern
+    RET_CHECK(mspi_nand_get_busy(&busy));
+    if(busy == false) {
+        am_util_stdio_printf("Flash TEST: Flash is not busy immediately after CMD_READ_PAGE! \n");
+        return 1;
+    }
+    am_util_delay_ms(10); // Longer than tRead
+    RET_CHECK(mspi_nand_get_busy(&busy));
+    if(busy == true) {
+        am_util_stdio_printf("Flash TEST: Flash is still busy 10ms after CMD_READ_PAGE! \n");
+        return 1;
+    }
 
     // TODO: get_features, done partly via get_writable 
 
