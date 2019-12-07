@@ -8,9 +8,10 @@
                 "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/utils",
                 "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/devices",
                 "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/mcu/apollo3",
+                "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/mcu/apollo3/hal",
                 "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/CMSIS/AmbiqMicro/Include",
                 "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/CMSIS/ARM/Include",
-                "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/boards/apollo3_evb"
+                "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/boards/apollo3_evb/bsp"
             ],
             "defines": [
                 "AM_CUSTOM_BDADDR",
