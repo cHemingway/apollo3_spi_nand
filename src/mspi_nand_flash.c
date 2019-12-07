@@ -93,8 +93,8 @@ am_hal_mspi_dev_config_t  g_psMSPISettings =
     .eSpiMode             = AM_HAL_MSPI_SPI_MODE_0, // See micron datasheet
     .eClockFreq           = AM_HAL_MSPI_CLK_1P5MHZ,
 
-    .ui8TurnAround        = 3,
-    .eAddrCfg             = AM_HAL_MSPI_ADDR_2_BYTE, // TODO: How to map column address?
+    .ui8TurnAround        = 8,                       // For READ FROM CACHEx1 , 1 dummy byte = 8 bits
+    .eAddrCfg             = AM_HAL_MSPI_ADDR_2_BYTE, // Read address is 13 bit (12 addr + pane) and 3 dummy bits = 16
 
     .eInstrCfg            = AM_HAL_MSPI_INSTR_1_BYTE,       // One byte SPI
     .eDeviceConfig        = AM_HAL_MSPI_FLASH_SERIAL_CE0,   // Single SPI, CS0
@@ -479,16 +479,16 @@ uint32_t mspi_nand_get_busy(bool *busy) {
 
 
 /* 
- * Execute PAGE_READ command to read a page into the cache given column address
+ * Execute PAGE_READ command to read a page into the cache given page address
  */
-static uint32_t mspi_nand_cmd_page_read(uint32_t column_addr) {
+static uint32_t mspi_nand_cmd_page_read(uint32_t page_addr) {
     uint32_t ui32Status;
 
     // Read old size
     uint32_t mspi_cfg_old_asize = MSPI->CFG_b.ASIZE;
     MSPI->CFG_b.ASIZE = 0x02;   // Address is 3 bytes
 
-    ui32Status = am_device_command_write(ui32Module, CMD_PAGE_READ, true, column_addr, NULL, 0);
+    ui32Status = am_device_command_write(ui32Module, CMD_PAGE_READ, true, page_addr, NULL, 0);
 
     MSPI->CFG_b.ASIZE = mspi_cfg_old_asize;
 
@@ -524,19 +524,19 @@ uint32_t mspi_nand_test(void) {
     }
     
 
-    // Test reading a page, choose page 0
+    // Test reading a page
     // Should be immediately busy, then not busy after tRead
     // TODO: Check ECC?
-    RET_CHECK(mspi_nand_cmd_page_read(0xa5)); // Read Page a5 = 165, chosen for pattern
+    RET_CHECK(mspi_nand_cmd_page_read(0xa5)); // Read block a5 = 165, chosen for pattern
     RET_CHECK(mspi_nand_get_busy(&busy));
     if(busy == false) {
         am_util_stdio_printf("Flash TEST: Flash is not busy immediately after CMD_READ_PAGE! \n");
         return 1;
     }
-    am_util_delay_ms(10); // Longer than tRead
+    am_util_delay_us(80); // tRD is 80uS max with ECC enabled
     RET_CHECK(mspi_nand_get_busy(&busy));
     if(busy == true) {
-        am_util_stdio_printf("Flash TEST: Flash is still busy 10ms after CMD_READ_PAGE! \n");
+        am_util_stdio_printf("Flash TEST: Flash is still busy 80uS after CMD_READ_PAGE! \n");
         return 1;
     }
 
