@@ -41,6 +41,8 @@
 //
 //*****************************************************************************
 
+#include <string.h> // memcmp
+
 #include "mspi_nand_flash.h"
 #include "am_util_stdio.h"
 #include "am_util_delay.h"
@@ -60,13 +62,15 @@
 #define CMD_READ_CACHE_SINGLE   0x03
 #define CMD_PROGRAM_RANDOM_SINGLE 0x84
 
-#define CMD_READ_ID 0x9f
+#define CMD_READ_ID             0x9f
+#define CMD_READ_CACHE_X4       0x6B
+#define CMD_READ_CACHE_QUADIO   0xEB
 
-#define CMD_READ_CACHE_QUADIO 0xEB
+
 #define CMD_PROGRAM_RANDOM_QUAD 0x34
 
-#define CMD_GET_FEATURES 0x0F
-#define CMD_SET_FEATURES 0x1F
+#define CMD_GET_FEATURES        0x0F
+#define CMD_SET_FEATURES        0x1F
 
 #define FEATURE_REG_BLOCK_LOCK 0xA0    // Block lock feature register
 
@@ -336,8 +340,11 @@ uint32_t mspi_nand_init(void **pHandle)
 
     //
     // Configure the MSPI pins.
+    // Here we change to QuadSPI mode, so the pins are enabled for this
     //
-    am_bsp_mspi_pins_enable(ui32Module, g_psMSPISettings.eDeviceConfig);
+    am_hal_mspi_device_e pins_device_config = g_psMSPISettings.eDeviceConfig;
+    pins_device_config = AM_HAL_MSPI_FLASH_QUAD_CE0; //TODO: Make chip select configurable
+    am_bsp_mspi_pins_enable(ui32Module, pins_device_config);
 
     //
     // Enable MSPI interrupts.
@@ -370,6 +377,45 @@ uint32_t mspi_nand_init(void **pHandle)
     //
     return AM_DEVICES_MSPI_FLASH_STATUS_SUCCESS;
 }
+
+
+/*
+ * Private function to change device to/from SPI to/from QuadSPI
+ */
+static uint32_t mspi_set_use_quadspi(bool use_quadspi) {
+    uint32_t ui32Status;
+
+    // Disable MSPI defore re-configuring it
+    ui32Status = am_hal_mspi_disable(g_pMSPIHandle);
+    if (AM_HAL_STATUS_SUCCESS != ui32Status)
+    {
+        return AM_DEVICES_MSPI_FLASH_STATUS_ERROR;
+    }
+    //
+    // Re-Configure the MSPI for the requested operation mode.
+    //
+    if (use_quadspi) {
+        g_psMSPISettings.eDeviceConfig = AM_HAL_MSPI_FLASH_QUAD_CE0;
+        g_psMSPISettings.eXipMixedMode = AM_HAL_MSPI_XIPMIXED_D4; // 1:1:4 for instruction, address, timing
+    } else {
+        g_psMSPISettings.eDeviceConfig = AM_HAL_MSPI_FLASH_SERIAL_CE0;
+        g_psMSPISettings.eXipMixedMode = AM_HAL_MSPI_XIPMIXED_NORMAL; // 1:1:4 for instruction, address, timing
+    }
+    ui32Status = am_hal_mspi_device_configure(g_pMSPIHandle, &g_psMSPISettings);
+    if (AM_HAL_STATUS_SUCCESS != ui32Status)
+    {
+        return AM_DEVICES_MSPI_FLASH_STATUS_ERROR;
+    }
+    // Re-Enable MSPI
+    ui32Status = am_hal_mspi_enable(g_pMSPIHandle);
+    if (AM_HAL_STATUS_SUCCESS != ui32Status)
+    {
+        return AM_DEVICES_MSPI_FLASH_STATUS_ERROR;
+    }
+
+    return AM_HAL_STATUS_SUCCESS;
+}
+
 
 uint32_t mspi_nand_id(void)
 {
@@ -558,11 +604,92 @@ static uint32_t mspi_nand_cmd_read_x1(uint16_t column_addr, uint32_t *data, uint
     return ui32Status;
 }
 
+/* 
+ * Execute READ FROM CACHE x4 to read single page into Cache with x1 instruction + address, x4 data
+ * FIXME: Not currently working! Instr is sent as Quad, not SPI as it should be
+ */
+static uint32_t mspi_nand_cmd_read_x4(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
+    uint32_t ui32Status;
+
+    // Change to 2 byte addresses
+    MSPI->CFG_b.ASIZE = 0x02;   // Address is 2 bytes
+
+    // 4 Turnaround cycles
+    MSPI->CFG_b.TURNAROUND = 4;
+
+    // Change to Quad mode
+    ui32Status = mspi_set_use_quadspi(true);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+
+    // Create the individual write transaction.
+    g_PIOTransaction.eDirection         = AM_HAL_MSPI_RX;
+    g_PIOTransaction.bSendAddr          = true;
+    g_PIOTransaction.ui32DeviceAddr     = column_addr;
+    g_PIOTransaction.bSendInstr         = true;
+    g_PIOTransaction.ui16DeviceInstr    = CMD_READ_CACHE_X4;
+    g_PIOTransaction.bTurnaround        = true;
+    g_PIOTransaction.ui32NumBytes       = data_len;
+    g_PIOTransaction.bQuadCmd           = true;    // Command is _not_ quad, only address + data
+
+    g_PIOTransaction.pui32Buffer        = data;
+
+    // Execute the transction over MSPI.
+    ui32Status = am_hal_mspi_blocking_transfer(g_pMSPIHandle, &g_PIOTransaction,
+                                         AM_DEVICES_MSPI_FLASH_TIMEOUT);
+
+    // Change back to SPI mode
+    ui32Status = mspi_set_use_quadspi(false);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+
+    return ui32Status;
+}
+
+
+/* 
+ * Execute READ FROM CACHE Quad I/O to read single page into Cache
+ * FIXME: Not currently working! Instr is sent as Quad, not SPI as it should be
+ */
+static uint32_t mspi_nand_cmd_read_quadio(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
+    uint32_t ui32Status;
+
+    // Change to 2 byte addresses
+    MSPI->CFG_b.ASIZE = 0x02;   // Address is 2 bytes
+
+    // 4 Turnaround cycles
+    MSPI->CFG_b.TURNAROUND = 4;
+
+    // Change to Quad mode
+    ui32Status = mspi_set_use_quadspi(true);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+
+    // Create the individual write transaction.
+    g_PIOTransaction.eDirection         = AM_HAL_MSPI_RX;
+    g_PIOTransaction.bSendAddr          = true;
+    g_PIOTransaction.ui32DeviceAddr     = column_addr;
+    g_PIOTransaction.bSendInstr         = true;
+    g_PIOTransaction.ui16DeviceInstr    = CMD_READ_CACHE_QUADIO;
+    g_PIOTransaction.bTurnaround        = true;
+    g_PIOTransaction.ui32NumBytes       = data_len;
+    g_PIOTransaction.bQuadCmd           = false;    // Command is _not_ quad, only address + data
+
+    g_PIOTransaction.pui32Buffer        = data;
+
+    // Execute the transction over MSPI.
+    ui32Status = am_hal_mspi_blocking_transfer(g_pMSPIHandle, &g_PIOTransaction,
+                                         AM_DEVICES_MSPI_FLASH_TIMEOUT);
+
+    // Change back to SPI mode
+    ui32Status = mspi_set_use_quadspi(false);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+
+    return ui32Status;
+}
+
 /*
  * Read the parameter page (blocking) from the flash into *params_page of size len
  * Len must be > PARAMETER_PAGE_SIZE
  */
-uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len) {
+uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len, bool use_quad) {
     uint32_t ui32Status;
     uint8_t  reg_config, old_reg_config;
     bool busy = true;
@@ -593,7 +720,11 @@ uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len) {
     }
 
     // Read out params page from cache
-    ui32Status = mspi_nand_cmd_read_x1(PARAMETER_PAGE_COLUMN_ADDR, (uint32_t *)params_page, len);
+    if (use_quad) {
+        ui32Status = mspi_nand_cmd_read_quadio(PARAMETER_PAGE_COLUMN_ADDR, (uint32_t *)params_page, len);
+    } else {
+        ui32Status = mspi_nand_cmd_read_x1(PARAMETER_PAGE_COLUMN_ADDR, (uint32_t *)params_page, len);
+    }
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     // Write original value back to old_reg_config to exit parameter page reading mode
@@ -607,6 +738,7 @@ uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len) {
 uint32_t mspi_nand_test(void) {
     bool writable = false, busy = false; // For get_writable();
     uint8_t params_page[PARAMETER_PAGE_SIZE];
+    uint8_t quad_params_page[PARAMETER_PAGE_SIZE];
 
     // Quick test macros. TODO: Use a proper framework from someone else!
     #define STRINGIFY(x) #x
@@ -650,12 +782,19 @@ uint32_t mspi_nand_test(void) {
     }
 
     // Read page from cache using x1 interface
-    RET_CHECK(mspi_nand_cmd_read_x1(0x00, (uint32_t *)page_buffer, PAGE_SIZE));
+    // RET_CHECK(mspi_nand_cmd_read_x1(0x00, (uint32_t *)page_buffer, PAGE_SIZE));
 
+    // Read params page using SPI
+    RET_CHECK(mspi_nand_read_params_page(params_page, PARAMETER_PAGE_SIZE, false));
 
-    // Read params page
-    RET_CHECK(mspi_nand_read_params_page(params_page, PARAMETER_PAGE_SIZE));
+    // Read params page using Quad IO
+    RET_CHECK(mspi_nand_read_params_page(quad_params_page, PARAMETER_PAGE_SIZE, true));
 
+    // Check same
+    if (memcmp(params_page, quad_params_page, PARAMETER_PAGE_SIZE) != 0) {
+        am_util_stdio_printf("Flash TEST: Read x1 and Read Quad I/O get different parameter page! \n");
+        return AM_HAL_STATUS_FAIL;
+    }
 
     #undef RET_CHECK
     #undef TOSTRING
