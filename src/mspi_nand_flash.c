@@ -107,7 +107,7 @@
 am_hal_mspi_dev_config_t  g_psMSPISettings =
 {
     .eSpiMode             = AM_HAL_MSPI_SPI_MODE_0, // See micron datasheet
-    .eClockFreq           = AM_HAL_MSPI_CLK_1P5MHZ,
+    .eClockFreq           = AM_HAL_MSPI_CLK_6MHZ,
 
     .ui8TurnAround        = 8,                       // For READ FROM CACHEx1 , 1 dummy byte = 8 bits
     .eAddrCfg             = AM_HAL_MSPI_ADDR_2_BYTE, // Read address is 13 bit (12 addr + pane) and 3 dummy bits = 16
