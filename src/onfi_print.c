@@ -28,10 +28,23 @@ const int device_mpn_offset = 44;
 const int jedec_mfn_id_offset = 64;
 const int date_code_offset = 65;
 
-const int bytes_per_page_offset = 80;
-const int pages_per_block_offset = 92;
-const int blocks_per_lun_offset  = 96;
-const int num_lun_offset         = 100;
+/* Memory Organisation Block */
+const int bytes_per_page_offset         = 80;
+const int spare_bytes_per_page_offset   = 84;
+const int pages_per_block_offset        = 92;
+const int blocks_per_lun_offset         = 96;
+const int num_lun_offset                = 100;
+const int num_addr_cycles_offset        = 101;
+const int bits_per_cell_offset          = 102;
+const int bad_blocks_max_per_lun_offset = 103;
+const int block_endurance_offset        = 105;
+const int gauranteed_valid_blocks_offset= 107;
+const int gauranteed_blocks_endurance_offset= 108;
+const int num_programs_per_page_offset  = 110;
+const int num_bits_ecc_correctable_offset= 112;
+// TODO: Bitfields
+
+/* Electrical Parameters Block */
 
 
 
@@ -45,6 +58,15 @@ static uint16_t extract_int16(const uint8_t *b) {
 static uint32_t extract_int32(const uint8_t *b) {
     return (b[0] << 0) | (b[1] << 8) | (b[2] << 16) | (b[3] << 24);
 }
+
+/* Functions to print a parameter given the name, minus _offset suffix
+ * e.g. PRINT_PARAM_UINT16(bytes_per_page_offset) prints "  bytes_per_page: 12 \n"
+ * Note 2 leading spaces are included for alignment
+ */
+#define PRINT_PARAM_UINT8(NAME)  printf("  " #NAME ": %u \n", parameter_page[NAME ## _offset])
+#define PRINT_PARAM_UINT16(NAME) printf("  " #NAME ": %u \n", extract_int16(parameter_page + NAME ## _offset))
+#define PRINT_PARAM_UINT32(NAME) printf("  " #NAME ": %lu \n", extract_int32(parameter_page+ NAME ## _offset))
+
 
 /*
  * Pretty-Prints a parameter_page to stdout
@@ -97,22 +119,35 @@ uint32_t onfi_print(const uint8_t parameter_page[256], size_t page_len, bool det
     uint16_t pages_per_block = extract_int16(parameter_page + pages_per_block_offset);
     uint16_t blocks_per_lun = extract_int16(parameter_page + blocks_per_lun_offset);
     uint8_t logical_units = parameter_page[num_lun_offset];
+    
+    // ** Memory Organisation Block, todo: Print only if detailed
+    if (detailed) {
+        printf("MEMORY ORGANISATION BLOCK: \n");
+        {
+            PRINT_PARAM_UINT32(bytes_per_page);
+            PRINT_PARAM_UINT16(spare_bytes_per_page);
+            PRINT_PARAM_UINT32(pages_per_block);
+            PRINT_PARAM_UINT32(blocks_per_lun);
+            PRINT_PARAM_UINT8(num_lun);
+            PRINT_PARAM_UINT8(num_addr_cycles);
+            PRINT_PARAM_UINT8(bits_per_cell);
+            PRINT_PARAM_UINT16(bad_blocks_max_per_lun);
+            PRINT_PARAM_UINT16(block_endurance);
+            PRINT_PARAM_UINT8(gauranteed_valid_blocks);
+            PRINT_PARAM_UINT16(gauranteed_blocks_endurance);
+            PRINT_PARAM_UINT8(num_programs_per_page);
+            PRINT_PARAM_UINT8(num_bits_ecc_correctable);
+        }
+    }
+
+    //  Show total size in Mega Bytes and how it is calculated
 
     uint32_t total_size = bytes_per_page * pages_per_block
                           * blocks_per_lun * logical_units;
 
-    if (!detailed) { // Quit early if not detailed
-        //  Show total size in Mega Bytes and how it is calculated
-        printf("CAPACITY: %u MB", total_size / (1024*1024));
-        printf(" = %u bytes * %u pages * %u blocks * %u units \n",
-                bytes_per_page, pages_per_block, blocks_per_lun, logical_units);
-        return 0; // Success
-    }
-    
-    // ** Memory Organisation Block, todo: Print only if detailed
-    printf("MEMORY ORGANISATION BLOCK: \n");
-    {
-        printf("NOT IMPLEMENTED \n"); //TODO:
-    }
+    printf("CAPACITY: %lu MB", total_size / (1024*1024));
+    printf(" = %lu bytes * %u pages * %u blocks * %u units \n",
+            bytes_per_page, pages_per_block, blocks_per_lun, logical_units);
+    return 0; // Success
 
 }
