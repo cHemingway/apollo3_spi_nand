@@ -33,6 +33,9 @@ uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len, bool use
 /* After init, run this to test all features */
 uint32_t mspi_nand_test(void);
 
+/* Print all bad blocks, for debug */
+uint32_t mspi_nand_print_bad_blocks(void);
+
 
 #endif // AM_DEVICES_MSPI_FLASH_H
 

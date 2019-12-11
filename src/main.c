@@ -93,8 +93,10 @@ int main(void)
             am_hal_gpio_output_set(AM_BSP_GPIO_LED3);
             am_hal_gpio_output_clear(AM_BSP_GPIO_LED0);
         }
+
+        mspi_nand_print_bad_blocks();
         
-        am_util_delay_ms(1000);
+        am_util_delay_ms(2000);
     }
 
     // Go to Deep Sleep.

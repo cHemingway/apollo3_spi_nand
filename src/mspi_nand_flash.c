@@ -50,6 +50,8 @@
 #include "am_util_delay.h"
 #include "am_bsp.h"
 
+// Disable warning for unused functions in this file
+#pragma GCC diagnostic ignored "-Wunused-function"
 
 #define AM_DEVICES_MSPI_FLASH_TIMEOUT             1000000
 
@@ -100,15 +102,23 @@
 
 #define PAGE_SIZE   (128+(2*1024))  // Page is 128 Metadata/ECC + 2K Data
 
+#define PAGES_PER_BLOCK 64
+#define LOG2_PPB        6
+#define NUM_BLOCKS      2048
+
 #define PARAMETER_PAGE_SIZE 256        // Parameter page is 255 bytes, repeats up to PAGE_SIZE
 #define PARAMETER_PAGE_PAGE_ADDR 0x01  // Parameter table is page 0x01 (only in OTP/Param access mode)
 #define PARAMETER_PAGE_COLUMN_ADDR 0x00 // Parameter table starts at column 0x00
+
+#define BAD_BLOCK_PAGE_OFFSET 0x00      // Page within block that bad block marking is in
+#define BAD_BLOCK_BYTE_OFFSET 2048      // Offset of bad block within page (column address)
+#define BAD_BLOCK_MARKER_VALUE  0x00    // 0x00 in byte 2048 (1st spare) = bad block     
 
 // NAND Flash device configuration structure
 am_hal_mspi_dev_config_t  g_psMSPISettings =
 {
     .eSpiMode             = AM_HAL_MSPI_SPI_MODE_0, // See micron datasheet
-    .eClockFreq           = AM_HAL_MSPI_CLK_3MHZ,
+    .eClockFreq           = AM_HAL_MSPI_CLK_6MHZ,
 
     .ui8TurnAround        = 8,                       // For READ FROM CACHEx1 , 1 dummy byte = 8 bits
     .eAddrCfg             = AM_HAL_MSPI_ADDR_2_BYTE, // Read address is 13 bit (12 addr + pane) and 3 dummy bits = 16
@@ -144,6 +154,13 @@ uint8_t                         page_buffer[PAGE_SIZE] __attribute__((aligned(4)
 
 
 const uint32_t ui32Module = 0; // Index of MSPI module. Apollo3 only has MSPI0
+
+
+// Convert a block number into a block/page address
+static inline uint32_t block_to_page_addr(uint32_t block_addr) {
+    return block_addr << LOG2_PPB;
+}
+
 
 //*****************************************************************************
 //
@@ -770,8 +787,64 @@ uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len, bool use
 }
 
 
+uint32_t mspi_nand_check_bad_block(uint32_t block_addr, bool *is_bad) {
+    uint32_t ui32Status, page_addr;
+    uint8_t marker = ! BAD_BLOCK_MARKER_VALUE;
+    bool busy = true;
+
+    // Convert block addr into page addr (get first page)
+    page_addr = block_to_page_addr(block_addr);
+
+     // Read params page into cache
+    ui32Status = mspi_nand_cmd_page_read(page_addr + BAD_BLOCK_PAGE_OFFSET);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+
+    // Spin until completed
+    // TODO: Timeout
+    do {
+        ui32Status = mspi_nand_get_busy(&busy);
+        if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    } while (busy==true);
+
+    // Read out single byte at marker address
+    ui32Status = mspi_nand_cmd_read_x1(BAD_BLOCK_BYTE_OFFSET, (uint32_t *)&marker, 1);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+
+    // Check for bad block marker
+    *is_bad = (marker == BAD_BLOCK_MARKER_VALUE);
+    // Success
+    return ui32Status;
+}
+
+
+/*
+ * Utility function to print the address of all bad blocks
+ * Can take a few hundred ms or so
+ * FIXME: Why are we not finding any bad blocks?
+ */
+uint32_t mspi_nand_print_bad_blocks(void) {
+    bool is_bad;
+    uint32_t ui32Status, total = 0;
+
+    am_util_stdio_printf("Checking for Bad Blocks, addresses (decimal): \n");
+    for (uint32_t i=0; i<NUM_BLOCKS; i++) {
+        ui32Status = mspi_nand_check_bad_block(i, &is_bad);
+        if (ui32Status != AM_HAL_STATUS_SUCCESS) {
+            am_util_stdio_printf("Failed to read block %lu \n", i);
+            return ui32Status;
+        }
+        if (is_bad) {
+            am_util_stdio_printf("%lu \n", i);
+            total++;
+        }
+    }
+    am_util_stdio_printf("COMPLETE, found %lu \n", total);
+    return ui32Status;
+}
+
+
 uint32_t mspi_nand_test(void) {
-    bool writable = false, busy = false; // For get_writable();
+    bool writable = false, busy = false, is_bad = false;
     uint8_t params_page[PARAMETER_PAGE_SIZE];
     uint8_t quad_params_page[PARAMETER_PAGE_SIZE];
 
@@ -826,6 +899,13 @@ uint32_t mspi_nand_test(void) {
                                  i, page_buffer[i]);
             break;
         }
+    }
+
+    // Test first block is not bad (should be good out of factory)
+    RET_CHECK(mspi_nand_check_bad_block(0, &is_bad));
+    if(is_bad) {
+        am_util_stdio_printf("Flash TEST: Block 0 reads as bad, but should be good! \n");
+        return AM_HAL_STATUS_FAIL;
     }
 
     // Read page from cache using x1 interface
