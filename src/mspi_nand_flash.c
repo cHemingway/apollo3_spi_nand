@@ -62,13 +62,14 @@
 
 #define CMD_PAGE_READ           0x13
 #define CMD_READ_CACHE_SINGLE   0x03
-#define CMD_PROGRAM_RANDOM_SINGLE 0x84
 
 #define CMD_READ_ID             0x9f
 #define CMD_READ_CACHE_X4       0x6B
 #define CMD_READ_CACHE_QUADIO   0xEB
 
-
+#define CMD_PROGRAM_LOAD        0x02
+#define CMD_PROGRAM_EXECUTE     0x10
+#define CMD_PROGRAM_RANDOM_SINGLE 0x84
 #define CMD_PROGRAM_RANDOM_QUAD 0x34
 
 #define CMD_GET_FEATURES        0x0F
@@ -107,7 +108,7 @@
 am_hal_mspi_dev_config_t  g_psMSPISettings =
 {
     .eSpiMode             = AM_HAL_MSPI_SPI_MODE_0, // See micron datasheet
-    .eClockFreq           = AM_HAL_MSPI_CLK_6MHZ,
+    .eClockFreq           = AM_HAL_MSPI_CLK_3MHZ,
 
     .ui8TurnAround        = 8,                       // For READ FROM CACHEx1 , 1 dummy byte = 8 bits
     .eAddrCfg             = AM_HAL_MSPI_ADDR_2_BYTE, // Read address is 13 bit (12 addr + pane) and 3 dummy bits = 16
@@ -594,12 +595,13 @@ static uint32_t mspi_nand_cmd_page_read(uint32_t page_addr) {
  */
 static uint32_t mspi_nand_cmd_read_x1(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
     uint32_t ui32Status;
+    uint32_t addr_plus_dummy = 0;
 
-    // Change to 2 byte addresses
-    MSPI->CFG_b.ASIZE = 0x02;   // Address is 2 bytes
+    // Hack: To make the MSPI peripheral ignore the dummy byte, we use 3 byte addresses 
+    // and left shift the address by one byte
+    MSPI->CFG_b.ASIZE = 0x02;   // Address is 3 bytes (but we keep byte 0 empty as dummy)
 
-    // Set 8 bit turnaround
-    MSPI->CFG_b.TURNAROUND = 8;
+    addr_plus_dummy = (uint32_t)column_addr << 8; // Move along, leave blank space
 
     ui32Status = am_device_command_read(ui32Module, CMD_READ_CACHE_SINGLE, true, column_addr, data , data_len);
 
@@ -614,7 +616,7 @@ static uint32_t mspi_nand_cmd_read_x4(uint16_t column_addr, uint32_t *data, uint
     uint32_t ui32Status;
 
     // Change to 2 byte addresses
-    MSPI->CFG_b.ASIZE = 0x02;   // Address is 2 bytes
+    MSPI->CFG_b.ASIZE = 0x01;   // Address is 2 bytes
 
     // 4 Turnaround cycles
     MSPI->CFG_b.TURNAROUND = 4;
@@ -655,7 +657,7 @@ static uint32_t mspi_nand_cmd_read_quadio(uint16_t column_addr, uint32_t *data, 
     uint32_t ui32Status;
 
     // Change to 2 byte addresses
-    MSPI->CFG_b.ASIZE = 0x02;   // Address is 2 bytes
+    MSPI->CFG_b.ASIZE = 0x01;   // Address is 2 bytes
 
     // 4 Turnaround cycles
     MSPI->CFG_b.TURNAROUND = 4;
@@ -686,6 +688,37 @@ static uint32_t mspi_nand_cmd_read_quadio(uint16_t column_addr, uint32_t *data, 
 
     return ui32Status;
 }
+
+/* 
+ * Execute Program Load x1 to write single page into cache
+ */
+static uint32_t mspi_nand_cmd_program_load_x1(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
+    uint32_t ui32Status;
+
+    // Change to 2 byte addresses
+    MSPI->CFG_b.ASIZE = 0x01;   // Address is 2 bytes
+
+    // No turnaround, immediately send data
+    MSPI->CFG_b.TURNAROUND = 0;
+
+    ui32Status = am_device_command_write(ui32Module, CMD_PROGRAM_LOAD, true, column_addr, data , data_len);
+
+    return ui32Status;
+}
+
+
+/* 
+ * Execute PROGRAM_EXECUTE to write a page from the cache given page address
+ */
+static uint32_t mspi_nand_cmd_program_execute(uint32_t page_addr) {
+    uint32_t ui32Status;
+
+    // Change to 3 byte addresses 
+    MSPI->CFG_b.ASIZE = 0x02;   // Address is 3 bytes
+    ui32Status = am_device_command_write(ui32Module, CMD_PROGRAM_EXECUTE, true, page_addr, NULL, 0);
+    return ui32Status;
+}
+
 
 /*
  * Read the parameter page (blocking) from the flash into *params_page of size len
@@ -781,6 +814,18 @@ uint32_t mspi_nand_test(void) {
     if(busy == true) {
         am_util_stdio_printf("Flash TEST: Flash is still busy 80uS after CMD_READ_PAGE! \n");
         return 1;
+    }
+
+    // Test writing a page into cache and reading it back. Do not actually program.
+    for (int i=0;i<PAGE_SIZE;i++) {page_buffer[i] =i&0xff;} // Ascending bytes
+    mspi_nand_cmd_program_load_x1(0, (uint32_t *)page_buffer, PAGE_SIZE);
+    mspi_nand_cmd_read_x1(0, (uint32_t *)page_buffer, PAGE_SIZE);
+    for (int i=0;i<PAGE_SIZE;i++) {
+        if (page_buffer[i] != (i & 0xff)) {
+            am_util_stdio_printf("Flash TEST: Read back wrong value from cache at %d, got %uud \n", 
+                                 i, page_buffer[i]);
+            break;
+        }
     }
 
     // Read page from cache using x1 interface
