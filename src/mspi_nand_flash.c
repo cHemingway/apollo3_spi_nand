@@ -603,7 +603,7 @@ static uint32_t mspi_nand_cmd_read_x1(uint16_t column_addr, uint32_t *data, uint
 
     addr_plus_dummy = (uint32_t)column_addr << 8; // Move along, leave blank space
 
-    ui32Status = am_device_command_read(ui32Module, CMD_READ_CACHE_SINGLE, true, column_addr, data , data_len);
+    ui32Status = am_device_command_read(ui32Module, CMD_READ_CACHE_SINGLE, true, addr_plus_dummy, data , data_len);
 
     return ui32Status;
 }
