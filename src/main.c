@@ -82,6 +82,27 @@ int main(void)
         am_hal_gpio_pinconfig(AM_BSP_GPIO_MSPI_CE0, GPIO_MSPI_CE0);
     }
 
+    #if TEST_MARK_BLOCK
+    {
+        uint32_t ret_code = 0;
+        bool is_bad;
+        printf("Marking block test... ");
+        ret_code = mspi_nand_check_bad_block(4, &is_bad);
+        if (is_bad) {
+            printf(" Already Marked! ");
+        }
+        ret_code = mspi_nand_mark_bad_block(4); // Mark block 4 as bad, should fail
+        ret_code = mspi_nand_check_bad_block(4, &is_bad);
+        if (is_bad) {
+            printf(" Success \n");
+        } else {
+            printf(" Failed! Block not marked as bad, or read incorrectly! \n");
+        }
+
+    }
+    #endif
+
+
     while(1) {
         retcode = mspi_nand_test();
         if (retcode == AM_HAL_STATUS_SUCCESS) {

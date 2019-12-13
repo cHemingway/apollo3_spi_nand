@@ -30,6 +30,10 @@ uint32_t mspi_nand_get_writable(bool *writable);
 
 uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len, bool use_quad);
 
+uint32_t mspi_nand_check_bad_block(uint32_t block_addr, bool *is_bad);
+
+uint32_t mspi_nand_mark_bad_block(uint32_t block_addr);
+
 /* After init, run this to test all features */
 uint32_t mspi_nand_test(void);
 

@@ -85,13 +85,15 @@
 #define FEATURE_REG_CONFIG_CFG_VALUE_READ_PARAMS    0x40 // Config:CFG value for read parameter page
 
 
-#define FEATURE_REG_STATUS     0xC0         // Status register
-#define FEATURE_REG_STATUSCACHE_READ_BUSY     0x07    // Mask for Cache Read Busy (CRBSY)
+#define FEATURE_REG_STATUS     0xC0         // Status register address
+#define FEATURE_REG_STATUS_CBRSY_MASK   0x80    // Mask for Cache Read Busy (CRBSY)
 // TODO: ECC Status bits 0:2
-#define FEATURE_REG_STATUS_P_FAIL_MASK  0x04    // Mask for program failure
+#define FEATURE_REG_STATUS_P_FAIL_MASK  0x08    // Mask for program failure
 #define FEATURE_REG_STATUS_E_FAIL_MASK  0x04    // Mask for erase failure
 #define FEATURE_REG_STATUS_WEL_MASK     0x02    // Mask for Write Enable Latch (WEL) bit. 1=Writable
 #define FEATURE_REG_STATUS_OIP_MASK     0x01    // Mask for Operation In Progress (OIP) bit. 1=Busy
+#define FEATURE_REG_STATUS_HAS_ERRORS_MASK  (FEATURE_REG_STATUS_P_FAIL_MASK | FEATURE_REG_STATUS_E_FAIL_MASK)
+
 
 #define FEATURE_REG_DIE_SELECT 0xD0    // Die select register
 
@@ -100,6 +102,8 @@
 #define nand_ID_MASK  0xfeff  // Allow both 0x2c46 (3.3V) and 0x2c47 (1.8V)
 
 #define RESET_TIME_MS 1 // Takes 565uS to reset, round up to 1ms
+#define ERASE_TIME_MS       10  // Max time to erase a block
+#define PROGRAM_TIME_MS     1   // Max time to program a page, 600uS
 
 #define PAGE_SIZE   (128+(2*1024))  // Page is 128 Metadata/ECC + 2K Data
 
@@ -112,7 +116,8 @@
 #define PARAMETER_PAGE_COLUMN_ADDR 0x00 // Parameter table starts at column 0x00
 
 #define BAD_BLOCK_PAGE_OFFSET 0x00      // Page within block that bad block marking is in
-#define BAD_BLOCK_BYTE_OFFSET 2048      // Offset of bad block within page (column address)
+#define BAD_BLOCK_FACTORY_BYTE_OFFSET 2048      // Byte address of factory bad block marker
+#define BAD_BLOCK_OUR_BYTE_OFFSET 2049          // Byte address of our bad block marker
 #define BAD_BLOCK_MARKER_VALUE  0x00    // 0x00 in byte 2048 (1st spare) = bad block     
 
 // NAND Flash device configuration structure
@@ -132,7 +137,7 @@ am_hal_mspi_dev_config_t  g_psMSPISettings =
     .bTurnaround          = true,                           // Enable turnaround
     // TODO: These are for use with DMA, check if OK
     .ui8ReadInstr         = CMD_READ_CACHE_SINGLE,      
-    .ui8WriteInstr        = CMD_PROGRAM_RANDOM_SINGLE,
+    .ui8WriteInstr        = CMD_PROGRAM_LOAD_RANDOM,
     .ui32TCBSize          = 0,                              // No DMA Transfer Control Buffer
     .pTCB                 = NULL,
     .scramblingStartAddr  = 0,                              // No data scrambling
@@ -572,8 +577,10 @@ uint32_t mspi_nand_get_writable(bool *writable) {
     return ui32Status;
 }
 
-
-uint32_t mspi_nand_get_busy(bool *busy) {
+/*
+ * Check if NAND is currently busy, returns immediately
+ */
+static uint32_t mspi_nand_get_busy(bool *busy) {
     uint32_t    ui32Status;
     uint8_t    status_reg;
 
@@ -588,6 +595,35 @@ uint32_t mspi_nand_get_busy(bool *busy) {
     } else {
         *busy = false;
     }
+
+    return ui32Status;
+}
+
+/*
+ * Wait until NAND is no longer busy, indicates if program or erase failure occured
+ */
+static uint32_t mspi_nand_wait_busy(uint32_t timeout_ms, bool *program_fail, bool *erase_fail) {
+    bool        busy;
+    uint32_t    ui32Status;
+    uint8_t    status_reg;
+
+    do {
+        // Get the status register
+        ui32Status = mspi_nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
+        if (ui32Status != AM_HAL_STATUS_SUCCESS) { // Exit early on error
+            return ui32Status;
+        }
+        // Get busy flag
+        busy = (status_reg & FEATURE_REG_STATUS_OIP_MASK) != 0;
+        if (!busy) {
+            break;      // Exit loop early so we don't have delay if busy==false
+        }
+        am_util_delay_ms(1);
+    } while (--timeout_ms);
+
+    // Check bits
+    *program_fail = (status_reg & FEATURE_REG_STATUS_P_FAIL_MASK) != 0;
+    *erase_fail = (status_reg & FEATURE_REG_STATUS_E_FAIL_MASK) != 0;
 
     return ui32Status;
 }
@@ -815,7 +851,7 @@ uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len, bool use
 
 uint32_t mspi_nand_check_bad_block(uint32_t block_addr, bool *is_bad) {
     uint32_t ui32Status, page_addr;
-    uint8_t marker = ! BAD_BLOCK_MARKER_VALUE;
+    uint8_t markers[2];
     bool busy = true;
 
     // Convert block addr into page addr (get first page)
@@ -832,14 +868,61 @@ uint32_t mspi_nand_check_bad_block(uint32_t block_addr, bool *is_bad) {
         if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     } while (busy==true);
 
-    // Read out single byte at marker address
-    ui32Status = mspi_nand_cmd_read_x1(BAD_BLOCK_BYTE_OFFSET, (uint32_t *)&marker, 1);
+    // Read out two bytes at marker address, one factory, one ours
+    ui32Status = mspi_nand_cmd_read_x1(BAD_BLOCK_FACTORY_BYTE_OFFSET, (uint32_t *)&markers, 2);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
-    // Check for bad block marker
-    *is_bad = (marker == BAD_BLOCK_MARKER_VALUE);
+    // Check for bad block markers
+    *is_bad = (markers[0] == BAD_BLOCK_MARKER_VALUE) || (markers[1] == BAD_BLOCK_MARKER_VALUE);
     // Success
     return ui32Status;
+}
+
+
+/*
+ * Function to mark a block as bad, takes block (not page) address
+ * Requires write to previously be enabled, and the spare location to equal 0xff
+ * Caution: Not intended to be reversible!
+ */
+uint32_t mspi_nand_mark_bad_block(uint32_t block_addr) {
+    bool busy = false, program_fail, erase_fail;
+    uint32_t ui32Status, page_addr;
+    uint8_t marker_value[] = {BAD_BLOCK_MARKER_VALUE}; // Needs to be array
+
+    /*
+     * We mark a block as bad by writing into our own
+     * To do this without loosing all the page data (useful for recovery?) we
+     * - Load the page into the cache register
+     * - Overwrite only our byte of the cache using program_load_random
+     * - Execute the write using program execute
+     * - Check completed, and OK (no write error)
+     */
+    page_addr = block_to_page_addr(block_addr);
+    // Read page into cache
+    ui32Status = mspi_nand_cmd_page_read(page_addr);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Wait until read completed
+    do {
+        ui32Status = mspi_nand_get_busy(&busy);
+        if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    } while(busy);
+
+    // Load marker value into our byte offset, within spare area
+    ui32Status = mspi_nand_cmd_program_load_random_x1(BAD_BLOCK_OUR_BYTE_OFFSET,
+                                                      (uint32_t *)marker_value,
+                                                      1);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Execute the write, write enable must be sent just before!
+    ui32Status = mspi_nand_write_enable();
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    ui32Status = mspi_nand_cmd_program_execute(page_addr);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Wait for write to be completed, or error
+    ui32Status = mspi_nand_wait_busy(PROGRAM_TIME_MS, &program_fail, &erase_fail);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    if (program_fail) return AM_HAL_STATUS_HW_ERR;
+
+    return AM_HAL_STATUS_SUCCESS; // Success
 }
 
 
