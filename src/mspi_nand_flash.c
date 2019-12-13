@@ -90,6 +90,16 @@ am_hal_mspi_dev_config_t  g_psMSPISettings =
 #error "No Flash defined!"
 #endif
 
+
+typedef enum {
+    ECC_OK = 0,
+    ECC_CORRECTED,      // Low level of error, refreshment not needed
+    ECC_SHOULD_REFRESH, // Medium error, should refresh
+    ECC_MUST_REFRESH,   // High level of error, must refresh data
+    ECC_FATAL           // Fatal error, cannot recover data fully
+} ecc_err_t;
+
+
 // Pointer to MSPI peripheral
 void                            *g_pMSPIHandle;   
 
@@ -731,6 +741,38 @@ static uint32_t mspi_nand_cmd_program_execute(uint32_t page_addr) {
     return ui32Status;
 }
 
+// Check ECC status after page read
+static uint32_t mspi_nand_check_ecc(enum ecc_err_t *ecc_err) {
+    uint32_t ui32Status;
+    uint8_t status_reg = 0;
+    ui32Status = mspi_nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
+
+    // Decode status reg into ECC error count, device specific
+    #ifdef MICRON_MT29F8G01AD
+    switch ((status_reg & FEATURE_REG_STATUS_ECC_MASK) >> FEATURE_REG_STATUS_ECC_SHIFT)
+    {
+        case FEATURE_REG_STATUS_ECC_NO_ERR:
+            ecc_err = ECC_OK;
+            break;
+        case FEATURE_REG_STATUS_ECC_1_3_ERR:
+            ecc_err = ECC_CORRECTED;
+            break;
+        case FEATURE_REG_STATUS_ECC_4_6_ERR:
+            ecc_err = ECC_SHOULD_REFRESH;
+            break;
+        case FEATURE_REG_STATUS_ECC_7_8_ERR:
+            ecc_err = ECC_MUST_REFRESH;
+            break;
+        case FEATURE_REG_STATUS_ECC_FATAL_ERR:
+            ecc_err = ECC_FATAL;
+            break;
+        default: // Should never happen! Safest to assume data is corrupted
+            ecc_err = ECC_FATAL;
+            break;
+    }
+    #endif
+    return ui32Status;
+}
 
 /*
  * Device specific initialization commands
@@ -738,6 +780,33 @@ static uint32_t mspi_nand_cmd_program_execute(uint32_t page_addr) {
 uint32_t mspi_nand_init_device(void) {
     // Unlock all blocks, as all are locked by default after power up
     return mspi_nand_cmd_set_features(FEATURE_REG_BLOCK_LOCK, FEATURE_REG_BLOCK_LOCK_UNLOCK_ALL);
+}
+
+
+/*
+ * Read a portion of a page
+ * Sets ecc_err if an uncorrectable ECC error occurred (correctable is ignored)
+ */
+uint32_t mspi_nand_read_page(uint32_t page_addr, uint16_t offset, 
+                             uint8_t *data, uint32_t len, 
+                             bool *ecc_err) {
+    uint32_t ui32Status;
+    bool ignore1, ignore2;
+    ecc_err_t ecc_err_detailed;
+
+    // Issue page read command
+    ui32Status = mspi_nand_cmd_page_read(page_addr);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Wait for completion
+    ui32Status = mspi_nand_wait_busy(PAGE_READ_TIME_MS, &ignore1, &ignore2);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Read out the data at offset
+    ui32Status = mspi_nand_cmd_read_x1(offset, (uint32_t *)data, len);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Check ECC error. TODO: ECC error counters
+    mspi_nand_check_ecc(&ecc_err_detailed);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    *ecc_err = (ecc_err_detailed == ECC_FATAL);
 }
 
 
@@ -765,7 +834,7 @@ uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len, bool use
     mspi_nand_cmd_set_features(FEATURE_REG_CONFIG, reg_config);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
-    // Read params page into cache
+    // Read params page into cache. We can't use read_page as no ECC here
     ui32Status = mspi_nand_cmd_page_read(PARAMETER_PAGE_PAGE_ADDR);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
@@ -915,7 +984,7 @@ uint32_t mspi_nand_test(void) {
         am_util_stdio_printf("Flash TEST: Writable status was not enabled! \n");
         return 1;
     }
-    // Enable write and check if writable status is correct
+    // Disable write and check if writable status is correct
     RET_CHECK(mspi_nand_write_disable());
     RET_CHECK(mspi_nand_get_writable(&writable));
     if (writable == true) {

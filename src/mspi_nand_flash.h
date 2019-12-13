@@ -34,6 +34,10 @@ uint32_t mspi_nand_check_bad_block(uint32_t block_addr, bool *is_bad);
 
 uint32_t mspi_nand_mark_bad_block(uint32_t block_addr);
 
+uint32_t mspi_nand_read_page(uint32_t page, uint16_t offset, 
+                             uint8_t *data, uint32_t len, 
+                             bool *ecc_err);
+
 /* After init, run this to test all features */
 uint32_t mspi_nand_test(void);
 

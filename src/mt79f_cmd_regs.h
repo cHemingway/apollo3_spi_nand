@@ -36,7 +36,14 @@
 #define FEATURE_REG_STATUS_E_FAIL_MASK  0x04    // Mask for erase failure
 #define FEATURE_REG_STATUS_WEL_MASK     0x02    // Mask for Write Enable Latch (WEL) bit. 1=Writable
 #define FEATURE_REG_STATUS_OIP_MASK     0x01    // Mask for Operation In Progress (OIP) bit. 1=Busy
-#define FEATURE_REG_STATUS_HAS_ERRORS_MASK  (FEATURE_REG_STATUS_P_FAIL_MASK | FEATURE_REG_STATUS_E_FAIL_MASK)
+
+#define FEATURE_REG_STATUS_ECC_MASK     0x70    // Mask for ECC bits
+#define FEATURE_REG_STATUS_ECC_SHIFT    4       // Shift for ECC status bits
+#define FEATURE_REG_STATUS_ECC_NO_ERR    0      // Shifted values of ECC status bits
+#define FEATURE_REG_STATUS_ECC_1_3_ERR   1      // 1-3 errors, OK
+#define FEATURE_REG_STATUS_ECC_FATAL_ERR 2      // >8 bit errors, not recoverable
+#define FEATURE_REG_STATUS_ECC_4_6_ERR   3      // 4-6 errors, should refresh
+#define FEATURE_REG_STATUS_ECC_7_8_ERR   5      // 7-8 errors, must refresh
 
 
 #define FEATURE_REG_DIE_SELECT 0xD0    // Die select register
@@ -48,6 +55,7 @@
 #define RESET_TIME_MS 1 // Takes 565uS to reset, round up to 1ms
 #define ERASE_TIME_MS       10  // Max time to erase a block
 #define PROGRAM_TIME_MS     1   // Max time to program a page, 600uS
+#define PAGE_READ_TIME_MS   1   // Max time to read a page, 80uS
 
 #define PAGE_SIZE   (128+(2*1024))  // Page is 128 Metadata/ECC + 2K Data
 
