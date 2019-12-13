@@ -15,6 +15,11 @@ typedef enum
     AM_DEVICES_MSPI_FLASH_STATUS_ERROR
 } am_devices_mspi_flash_status_t;
 
+#define PAGE_SIZE       (2*1024)  
+#define PAGES_PER_BLOCK 64
+#define LOG2_PPB        6
+#define NUM_BLOCKS      2048
+
 
 uint32_t mspi_nand_init(void **pHandle);
 
@@ -33,6 +38,10 @@ uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len, bool use
 uint32_t mspi_nand_check_bad_block(uint32_t block_addr, bool *is_bad);
 
 uint32_t mspi_nand_mark_bad_block(uint32_t block_addr);
+
+uint32_t mspi_nand_erase_block(uint16_t block_addr);
+
+uint32_t mspi_nand_prog_page(uint32_t page_addr, uint8_t data[]);
 
 uint32_t mspi_nand_read_page(uint32_t page, uint16_t offset, 
                              uint8_t *data, uint32_t len, 

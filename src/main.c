@@ -1,8 +1,9 @@
 // Template project for Ambiq Apollo 3, including Segger RTT and SysTick example
 // Flashes LED on Sparkfun Edge board
 
-// For printf, will pick up _write() in SEGGER_RTT_Syscalls_GCC.c
-#include <stdio.h>
+
+#include <stdio.h> // For printf, will pick up _write() in SEGGER_RTT_Syscalls_GCC.c
+#include <string.h> // memcmp
 
 #include "am_mcu_apollo.h"
 #include "am_bsp.h"
@@ -12,6 +13,10 @@
 #include "SEGGER_RTT.h"
 
 #include "mspi_nand_flash.h"
+
+// Test buffer to store pages in
+uint8_t write_page[PAGE_SIZE];
+uint8_t read_page[PAGE_SIZE];
 
 // Override am_print_string so hard_fault_handler outputs over RTT
 void am_print_string(char *pcStr) {
@@ -102,6 +107,48 @@ int main(void)
     }
     #endif
 
+    #if 1 // TEST_PROGRAM_BLOCK
+    {
+        uint32_t ret_code;
+        const uint32_t block_addr = 4;   // Block 4 is in gauranteed non-bad section
+        const uint32_t page_addr = block_addr*PAGES_PER_BLOCK;
+        bool ecc_err;
+
+        printf("Block erase and reprogram test \n");
+
+        // Generate Data
+        for (int i=0; i<PAGE_SIZE; i++) {
+            write_page[i] = ((i&0xf) << 4) | (i&0xf); // generate 00, 11, 22, 33 etc
+        }
+
+        // Erase page and write value
+        ret_code = mspi_nand_erase_block(block_addr);
+        if (ret_code) {
+            printf("Failed! Erase block returned %lu",ret_code);
+        }
+        ret_code = mspi_nand_prog_page(page_addr, write_page);
+        if (ret_code) {
+            printf("Failed! Prog page returned %lu",ret_code);
+        }
+
+        // Read page 0 in between to clear cache
+        ret_code = mspi_nand_read_page(0, 0, read_page, PAGE_SIZE, &ecc_err);
+
+        // Read back
+        ret_code = mspi_nand_read_page(page_addr, 0, read_page, PAGE_SIZE, &ecc_err);
+        if (ret_code) {
+            printf("Failed! Prog page returned %lu",ret_code);
+        }
+
+        // Check read correctly
+        if(0 != memcmp(read_page, write_page, PAGE_SIZE)) {
+            printf("Failed! Read vs Written does not match.");
+        }
+
+    }
+    printf("Success! \n");
+    while(1);
+    #endif
 
     while(1) {
         retcode = mspi_nand_test();

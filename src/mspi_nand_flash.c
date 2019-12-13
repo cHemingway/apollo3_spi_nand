@@ -54,6 +54,10 @@
 #include "mt79f_cmd_regs.h"           // Command and register values, page size
 #endif
 
+#if DEVICE_PAGE_SIZE != PAGE_SIZE
+#error "PAGE_SIZE in mspi_nand_flash.h is not equal to device page size"
+#endif
+
 // Disable warning for unused functions in this file
 #pragma GCC diagnostic ignored "-Wunused-function"
 
@@ -814,6 +818,31 @@ uint32_t mspi_nand_erase_block(uint16_t block_addr) {
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     if (erase_err) return AM_HAL_STATUS_HW_ERR;
     return AM_HAL_STATUS_SUCCESS;
+}
+
+
+/*
+ * Function to program a page. Takes data[] of PAGE_SIZE and programs the lot
+ * Caution: Does not check if block is bad or not!
+ */
+uint32_t mspi_nand_prog_page(uint32_t page_addr, uint8_t data[]) {
+    bool program_fail, erase_fail;
+    uint32_t ui32Status;
+
+    // Load marker value into our byte offset, within spare area
+    ui32Status = mspi_nand_cmd_program_load_x1(0, (uint32_t *)data, PAGE_SIZE);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Execute the write, write enable must be sent just before!
+    ui32Status = mspi_nand_write_enable();
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    ui32Status = mspi_nand_cmd_program_execute(page_addr);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Wait for write to be completed, or error
+    ui32Status = mspi_nand_wait_busy(PROGRAM_TIME_MS, &program_fail, &erase_fail);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    if (program_fail) return AM_HAL_STATUS_HW_ERR;
+
+    return AM_HAL_STATUS_SUCCESS; // Success
 }
 
 

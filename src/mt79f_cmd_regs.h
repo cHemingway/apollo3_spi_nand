@@ -59,7 +59,9 @@
 #define PROGRAM_TIME_MS     1   // Max time to program a page, 600uS
 #define PAGE_READ_TIME_MS   1   // Max time to read a page, 80uS
 
-#define PAGE_SIZE   (128+(2*1024))  // Page is 128 Metadata/ECC + 2K Data
+#define DEVICE_PAGE_SIZE      (2*1024)  // Page is 2K Data
+#define METADATA_SIZE          128      // 128 bytes of user + ecc data
+#define PAGE_AND_METADATA_SIZE (PAGE_SIZE + METADATA_SIZE)
 
 #define PAGES_PER_BLOCK 64
 #define LOG2_PPB        6
