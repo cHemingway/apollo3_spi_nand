@@ -77,7 +77,8 @@
 #define CMD_GET_FEATURES        0x0F
 #define CMD_SET_FEATURES        0x1F
 
-#define FEATURE_REG_BLOCK_LOCK 0xA0    // Block lock feature register
+#define FEATURE_REG_BLOCK_LOCK 0xA0                     // Block lock feature register
+#define FEATURE_REG_BLOCK_LOCK_UNLOCK_ALL    0x00        // Value to unlock all
 
 #define FEATURE_REG_CONFIG     0xB0                      // Config feature register
 #define FEATURE_REG_CONFIG_CFG_MASK                 0xC1 // Config register CFG bits mask
@@ -155,6 +156,8 @@ uint8_t                         page_buffer[PAGE_SIZE] __attribute__((aligned(4)
 
 const uint32_t ui32Module = 0; // Index of MSPI module. Apollo3 only has MSPI0
 
+// Forward definition
+uint32_t mspi_nand_init_device(void);
 
 // Convert a block number into a block/page address
 static inline uint32_t block_to_page_addr(uint32_t block_addr) {
@@ -322,16 +325,12 @@ uint32_t mspi_nand_init(void **pHandle)
         return AM_DEVICES_MSPI_FLASH_STATUS_ERROR;
     }
 
-    //
-    // TODO: Device specific MSPI Flash initialization.
-    //
-    #if 0
-    ui32Status = am_device_init_flash(ui32Module, g_psMSPISettings);
+    // Device specific MSPI Flash initialization.
+    ui32Status = mspi_nand_init_device();
     if (AM_HAL_STATUS_SUCCESS != ui32Status)
     {
         return AM_DEVICES_MSPI_FLASH_STATUS_ERROR;
     }
-    #endif
 
     //
     // Initialize the MSPI settings for the MSPI_FLASH.
@@ -752,6 +751,15 @@ static uint32_t mspi_nand_cmd_program_execute(uint32_t page_addr) {
     MSPI->CFG_b.ASIZE = 0x02;   // Address is 3 bytes
     ui32Status = am_device_command_write(ui32Module, CMD_PROGRAM_EXECUTE, true, page_addr, NULL, 0);
     return ui32Status;
+}
+
+
+/*
+ * Device specific initialization commands
+ */
+uint32_t mspi_nand_init_device(void) {
+    // Unlock all blocks, as all are locked by default after power up
+    return mspi_nand_cmd_set_features(FEATURE_REG_BLOCK_LOCK, FEATURE_REG_BLOCK_LOCK_UNLOCK_ALL);
 }
 
 
