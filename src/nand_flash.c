@@ -1,12 +1,12 @@
 /*
- * mspi_nand.h
- * Driver for QuadSPI NAND Flash using CE0
- * Chris Hemingway, 2019
+ * nand_flash.h
+ * Driver for QuadSPI NAND Flash for Apollo 3 MCU
+ * Copyright: Chris Hemingway, 2019
  */
 
 //*****************************************************************************
 //
-// Functions mspi_nand_init, am_device_command_write, am_device_command_read 
+// Functions nand_init, am_device_command_write, am_device_command_read 
 // Copyright (c) 2019, Ambiq Micro
 // All rights reserved.
 // 
@@ -43,7 +43,7 @@
 
 #include <string.h> // memcmp
 
-#include "mspi_nand_flash.h"
+#include "nand_flash.h"
 #include "onfi_print.h"
 
 #include "am_util_stdio.h"
@@ -55,7 +55,7 @@
 #endif
 
 #if DEVICE_PAGE_SIZE != PAGE_SIZE
-#error "PAGE_SIZE in mspi_nand_flash.h is not equal to device page size"
+#error "PAGE_SIZE in nand_flash.h is not equal to device page size"
 #endif
 
 // Disable warning for unused functions in this file
@@ -118,7 +118,7 @@ uint8_t                         page_buffer[PAGE_SIZE] __attribute__((aligned(4)
 const uint32_t ui32Module = 0; // Index of MSPI module. Apollo3 only has MSPI0
 
 // Forward definition
-uint32_t mspi_nand_init_device(void);
+uint32_t nand_init_device(void);
 
 // Convert a block number into a block/page address
 static inline uint32_t block_to_page_addr(uint32_t block_addr) {
@@ -225,7 +225,7 @@ uint32_t am_device_command_read(uint32_t ui32Module, uint8_t ui8Instr, bool bSen
 
 
 
-uint32_t mspi_nand_reset(void)
+uint32_t nand_reset(void)
 {
 
   if (AM_HAL_STATUS_SUCCESS != am_device_command_write(ui32Module, CMD_RESET, false, 0, NULL, 0))
@@ -239,7 +239,7 @@ uint32_t mspi_nand_reset(void)
 
 
 
-uint32_t mspi_nand_init(void **pHandle)
+uint32_t nand_init(void **pHandle)
 {
     uint32_t      ui32Status;
 
@@ -281,13 +281,13 @@ uint32_t mspi_nand_init(void **pHandle)
         
 
 
-    if (AM_HAL_STATUS_SUCCESS != mspi_nand_reset())
+    if (AM_HAL_STATUS_SUCCESS != nand_reset())
     {
         return AM_DEVICES_MSPI_FLASH_STATUS_ERROR;
     }
 
     // Device specific MSPI Flash initialization.
-    ui32Status = mspi_nand_init_device();
+    ui32Status = nand_init_device();
     if (AM_HAL_STATUS_SUCCESS != ui32Status)
     {
         return AM_DEVICES_MSPI_FLASH_STATUS_ERROR;
@@ -397,7 +397,7 @@ static uint32_t mspi_set_use_quadspi(bool use_quadspi) {
 }
 
 
-uint32_t mspi_nand_id(void)
+uint32_t nand_id(void)
 {
     uint32_t      ui32Status;
     uint32_t      ui32DeviceID;
@@ -423,7 +423,7 @@ uint32_t mspi_nand_id(void)
  * Execute the GET_FEATURES command given a register address addr, to get the byte data
  * Not part of public API, as higher level functions (e.g. get status) should be used
  */
-static uint32_t mspi_nand_cmd_get_features(uint8_t addr, uint8_t *data) {
+static uint32_t nand_cmd_get_features(uint8_t addr, uint8_t *data) {
 
     uint32_t ui32Status;
     uint32_t returned_data = 0;
@@ -463,7 +463,7 @@ static uint32_t mspi_nand_cmd_get_features(uint8_t addr, uint8_t *data) {
  * Execute the SET_FEATURES command given a register address addr, to get the byte data
  * Not part of public API, as higher level functions (e.g. get status) should be used
  */
-static uint32_t mspi_nand_cmd_set_features(uint8_t addr, uint8_t data) {
+static uint32_t nand_cmd_set_features(uint8_t addr, uint8_t data) {
 
     uint32_t ui32Status;
     uint32_t data32 = data;
@@ -496,7 +496,7 @@ static uint32_t mspi_nand_cmd_set_features(uint8_t addr, uint8_t data) {
 }
 
 
-uint32_t mspi_nand_write_enable(void) {
+uint32_t nand_write_enable(void) {
     uint32_t      ui32Status;
 
     // Send write_enable command, no address, no data
@@ -505,7 +505,7 @@ uint32_t mspi_nand_write_enable(void) {
 }
 
 
-uint32_t mspi_nand_write_disable(void) {
+uint32_t nand_write_disable(void) {
     uint32_t      ui32Status;
 
     // Send write_enable command, no address, no data
@@ -514,12 +514,12 @@ uint32_t mspi_nand_write_disable(void) {
 }
 
 
-uint32_t mspi_nand_get_writable(bool *writable) {
+uint32_t nand_get_writable(bool *writable) {
     uint32_t    ui32Status;
     uint8_t    status_reg;
 
     // Get the status register
-    ui32Status = mspi_nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
+    ui32Status = nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) { // Exit early on error
         return ui32Status;
     }
@@ -536,12 +536,12 @@ uint32_t mspi_nand_get_writable(bool *writable) {
 /*
  * Check if NAND is currently busy, returns immediately
  */
-static uint32_t mspi_nand_get_busy(bool *busy) {
+static uint32_t nand_get_busy(bool *busy) {
     uint32_t    ui32Status;
     uint8_t    status_reg;
 
     // Get the status register
-    ui32Status = mspi_nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
+    ui32Status = nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) { // Exit early on error
         return ui32Status;
     }
@@ -558,14 +558,14 @@ static uint32_t mspi_nand_get_busy(bool *busy) {
 /*
  * Wait until NAND is no longer busy, indicates if program or erase failure occured
  */
-static uint32_t mspi_nand_wait_busy(uint32_t timeout_ms, bool *program_fail, bool *erase_fail) {
+static uint32_t nand_wait_busy(uint32_t timeout_ms, bool *program_fail, bool *erase_fail) {
     bool        busy;
     uint32_t    ui32Status;
     uint8_t    status_reg;
 
     do {
         // Get the status register
-        ui32Status = mspi_nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
+        ui32Status = nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
         if (ui32Status != AM_HAL_STATUS_SUCCESS) { // Exit early on error
             return ui32Status;
         }
@@ -588,7 +588,7 @@ static uint32_t mspi_nand_wait_busy(uint32_t timeout_ms, bool *program_fail, boo
 /* 
  * Execute PAGE_READ command to read a page into the cache given page address
  */
-static uint32_t mspi_nand_cmd_page_read(uint32_t page_addr) {
+static uint32_t nand_cmd_page_read(uint32_t page_addr) {
     uint32_t ui32Status;
 
     // Change to 3 byte addresses 
@@ -601,7 +601,7 @@ static uint32_t mspi_nand_cmd_page_read(uint32_t page_addr) {
 /* 
  * Execute READ FROM CACHE x1 to read single page into Cache
  */
-static uint32_t mspi_nand_cmd_read_x1(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
+static uint32_t nand_cmd_read_x1(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
     uint32_t ui32Status;
     uint32_t addr_plus_dummy = 0;
 
@@ -620,7 +620,7 @@ static uint32_t mspi_nand_cmd_read_x1(uint16_t column_addr, uint32_t *data, uint
  * Execute READ FROM CACHE x4 to read single page into Cache with x1 instruction + address, x4 data
  * FIXME: Not currently working! Instr is sent as Quad, not SPI as it should be
  */
-static uint32_t mspi_nand_cmd_read_x4(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
+static uint32_t nand_cmd_read_x4(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
     uint32_t ui32Status;
 
     // Change to 2 byte addresses
@@ -661,7 +661,7 @@ static uint32_t mspi_nand_cmd_read_x4(uint16_t column_addr, uint32_t *data, uint
  * Execute READ FROM CACHE Quad I/O to read single page into Cache
  * FIXME: Not currently working! Instr is sent as Quad, not SPI as it should be
  */
-static uint32_t mspi_nand_cmd_read_quadio(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
+static uint32_t nand_cmd_read_quadio(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
     uint32_t ui32Status;
 
     // Change to 2 byte addresses
@@ -700,7 +700,7 @@ static uint32_t mspi_nand_cmd_read_quadio(uint16_t column_addr, uint32_t *data, 
 /* 
  * Execute Program Load x1 to write single page into cache
  */
-static uint32_t mspi_nand_cmd_program_load_x1(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
+static uint32_t nand_cmd_program_load_x1(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
     uint32_t ui32Status;
 
     // Change to 2 byte addresses
@@ -718,7 +718,7 @@ static uint32_t mspi_nand_cmd_program_load_x1(uint16_t column_addr, uint32_t *da
 /* 
  * Execute Random Data Program x1, writes to cache _without_ clearing it
  */
-static uint32_t mspi_nand_cmd_program_load_random_x1(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
+static uint32_t nand_cmd_program_load_random_x1(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
     uint32_t ui32Status;
 
     // Change to 2 byte addresses
@@ -736,7 +736,7 @@ static uint32_t mspi_nand_cmd_program_load_random_x1(uint16_t column_addr, uint3
 /* 
  * Execute PROGRAM_EXECUTE to write a page from the cache given page address
  */
-static uint32_t mspi_nand_cmd_program_execute(uint32_t page_addr) {
+static uint32_t nand_cmd_program_execute(uint32_t page_addr) {
     uint32_t ui32Status;
 
     // Change to 3 byte addresses 
@@ -749,7 +749,7 @@ static uint32_t mspi_nand_cmd_program_execute(uint32_t page_addr) {
 /*
  * Execute BLOCK_ERASE to erase an entire block
  */
-static uint32_t mspi_nand_cmd_block_erase(uint32_t page_addr) {
+static uint32_t nand_cmd_block_erase(uint32_t page_addr) {
     uint32_t ui32Status;
 
     // Change to 3 byte addresses 
@@ -760,10 +760,10 @@ static uint32_t mspi_nand_cmd_block_erase(uint32_t page_addr) {
 
 
 // Check ECC status after page read
-static uint32_t mspi_nand_check_ecc(ecc_err_t *ecc_err) {
+static uint32_t nand_check_ecc(ecc_err_t *ecc_err) {
     uint32_t ui32Status;
     uint8_t status_reg = 0;
-    ui32Status = mspi_nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
+    ui32Status = nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
 
     // Decode status reg into ECC error count, device specific
     #ifdef MICRON_MT29F8G01AD
@@ -795,26 +795,26 @@ static uint32_t mspi_nand_check_ecc(ecc_err_t *ecc_err) {
 /*
  * Device specific initialization commands
  */
-uint32_t mspi_nand_init_device(void) {
+uint32_t nand_init_device(void) {
     // Unlock all blocks, as all are locked by default after power up
-    return mspi_nand_cmd_set_features(FEATURE_REG_BLOCK_LOCK, FEATURE_REG_BLOCK_LOCK_UNLOCK_ALL);
+    return nand_cmd_set_features(FEATURE_REG_BLOCK_LOCK, FEATURE_REG_BLOCK_LOCK_UNLOCK_ALL);
 }
 
 
 /*
  * Erase a block and checks status returned by chip
  */
-uint32_t mspi_nand_erase_block(uint16_t block_addr) {
+uint32_t nand_erase_block(uint16_t block_addr) {
     uint32_t ui32Status;
     bool unused, erase_err;
     // Enable write, as gets cleared by last program or erase_block function
-    ui32Status = mspi_nand_write_enable();
+    ui32Status = nand_write_enable();
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Block erase command
-    ui32Status = mspi_nand_cmd_block_erase(block_to_page_addr(block_addr));
+    ui32Status = nand_cmd_block_erase(block_to_page_addr(block_addr));
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait until not busy, check erase err, but ignore program error
-    ui32Status = mspi_nand_wait_busy(PAGE_READ_TIME_MS, &unused, &erase_err);
+    ui32Status = nand_wait_busy(PAGE_READ_TIME_MS, &unused, &erase_err);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     if (erase_err) return AM_HAL_STATUS_HW_ERR;
     return AM_HAL_STATUS_SUCCESS;
@@ -825,20 +825,20 @@ uint32_t mspi_nand_erase_block(uint16_t block_addr) {
  * Function to program a page. Takes data[] of PAGE_SIZE and programs the lot
  * Caution: Does not check if block is bad or not!
  */
-uint32_t mspi_nand_prog_page(uint32_t page_addr, uint8_t data[]) {
+uint32_t nand_prog_page(uint32_t page_addr, uint8_t data[]) {
     bool program_fail, erase_fail;
     uint32_t ui32Status;
 
     // Load marker value into our byte offset, within spare area
-    ui32Status = mspi_nand_cmd_program_load_x1(0, (uint32_t *)data, PAGE_SIZE);
+    ui32Status = nand_cmd_program_load_x1(0, (uint32_t *)data, PAGE_SIZE);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Execute the write, write enable must be sent just before!
-    ui32Status = mspi_nand_write_enable();
+    ui32Status = nand_write_enable();
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
-    ui32Status = mspi_nand_cmd_program_execute(page_addr);
+    ui32Status = nand_cmd_program_execute(page_addr);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait for write to be completed, or error
-    ui32Status = mspi_nand_wait_busy(PROGRAM_TIME_MS, &program_fail, &erase_fail);
+    ui32Status = nand_wait_busy(PROGRAM_TIME_MS, &program_fail, &erase_fail);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     if (program_fail) return AM_HAL_STATUS_HW_ERR;
 
@@ -850,7 +850,7 @@ uint32_t mspi_nand_prog_page(uint32_t page_addr, uint8_t data[]) {
  * Read a portion of a page
  * Sets ecc_err if an uncorrectable ECC error occurred (correctable is ignored)
  */
-uint32_t mspi_nand_read_page(uint32_t page_addr, uint16_t offset, 
+uint32_t nand_read_page(uint32_t page_addr, uint16_t offset, 
                              uint8_t *data, uint32_t len, 
                              bool *ecc_err) {
     uint32_t ui32Status;
@@ -858,16 +858,16 @@ uint32_t mspi_nand_read_page(uint32_t page_addr, uint16_t offset,
     ecc_err_t ecc_err_detailed;
 
     // Issue page read command
-    ui32Status = mspi_nand_cmd_page_read(page_addr);
+    ui32Status = nand_cmd_page_read(page_addr);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait for completion
-    ui32Status = mspi_nand_wait_busy(PAGE_READ_TIME_MS, &ignore1, &ignore2);
+    ui32Status = nand_wait_busy(PAGE_READ_TIME_MS, &ignore1, &ignore2);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Read out the data at offset
-    ui32Status = mspi_nand_cmd_read_x1(offset, (uint32_t *)data, len);
+    ui32Status = nand_cmd_read_x1(offset, (uint32_t *)data, len);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Check ECC error. TODO: ECC error counters
-    mspi_nand_check_ecc(&ecc_err_detailed);
+    nand_check_ecc(&ecc_err_detailed);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     *ecc_err = (ecc_err_detailed == ECC_FATAL);
     // Success
@@ -879,7 +879,7 @@ uint32_t mspi_nand_read_page(uint32_t page_addr, uint16_t offset,
  * Read the parameter page (blocking) from the flash into *params_page of size len
  * Len must be > PARAMETER_PAGE_SIZE
  */
-uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len, bool use_quad) {
+uint32_t nand_read_params_page(uint8_t *params_page, uint32_t len, bool use_quad) {
     uint32_t ui32Status;
     uint8_t  reg_config, old_reg_config;
     bool busy = true;
@@ -890,42 +890,42 @@ uint32_t mspi_nand_read_params_page(uint8_t *params_page, uint32_t len, bool use
     }
 
     // Modify CFG bits of Feature register Configuration (0xB0) to get params page
-    ui32Status = mspi_nand_cmd_get_features(FEATURE_REG_CONFIG, &old_reg_config);
+    ui32Status = nand_cmd_get_features(FEATURE_REG_CONFIG, &old_reg_config);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     reg_config = old_reg_config & ~FEATURE_REG_CONFIG_CFG_MASK; // Clear CFG bits
     reg_config |= FEATURE_REG_CONFIG_CFG_VALUE_READ_PARAMS;     // Set CFG to VALUE_READ_PARAMS, 010
 
-    mspi_nand_cmd_set_features(FEATURE_REG_CONFIG, reg_config);
+    nand_cmd_set_features(FEATURE_REG_CONFIG, reg_config);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     // Read params page into cache. We can't use read_page as no ECC here
-    ui32Status = mspi_nand_cmd_page_read(PARAMETER_PAGE_PAGE_ADDR);
+    ui32Status = nand_cmd_page_read(PARAMETER_PAGE_PAGE_ADDR);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     // Spin until completed
     while(busy) {
-        ui32Status = mspi_nand_get_busy(&busy);
+        ui32Status = nand_get_busy(&busy);
         if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     }
 
     // Read out params page from cache
     if (use_quad) {
-        ui32Status = mspi_nand_cmd_read_quadio(PARAMETER_PAGE_COLUMN_ADDR, (uint32_t *)params_page, len);
+        ui32Status = nand_cmd_read_quadio(PARAMETER_PAGE_COLUMN_ADDR, (uint32_t *)params_page, len);
     } else {
-        ui32Status = mspi_nand_cmd_read_x1(PARAMETER_PAGE_COLUMN_ADDR, (uint32_t *)params_page, len);
+        ui32Status = nand_cmd_read_x1(PARAMETER_PAGE_COLUMN_ADDR, (uint32_t *)params_page, len);
     }
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     // Write original value back to old_reg_config to exit parameter page reading mode
-    mspi_nand_cmd_set_features(FEATURE_REG_CONFIG, old_reg_config);
+    nand_cmd_set_features(FEATURE_REG_CONFIG, old_reg_config);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     return AM_HAL_STATUS_SUCCESS; // Return success
 }
 
 
-uint32_t mspi_nand_check_bad_block(uint32_t block_addr, bool *is_bad) {
+uint32_t nand_check_bad_block(uint32_t block_addr, bool *is_bad) {
     uint32_t ui32Status, page_addr;
     uint8_t markers[2];
     bool busy = true;
@@ -934,18 +934,18 @@ uint32_t mspi_nand_check_bad_block(uint32_t block_addr, bool *is_bad) {
     page_addr = block_to_page_addr(block_addr);
 
      // Read params page into cache
-    ui32Status = mspi_nand_cmd_page_read(page_addr + BAD_BLOCK_PAGE_OFFSET);
+    ui32Status = nand_cmd_page_read(page_addr + BAD_BLOCK_PAGE_OFFSET);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     // Spin until completed
     // TODO: Timeout
     do {
-        ui32Status = mspi_nand_get_busy(&busy);
+        ui32Status = nand_get_busy(&busy);
         if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     } while (busy==true);
 
     // Read out two bytes at marker address, one factory, one ours
-    ui32Status = mspi_nand_cmd_read_x1(BAD_BLOCK_FACTORY_BYTE_OFFSET, (uint32_t *)&markers, 2);
+    ui32Status = nand_cmd_read_x1(BAD_BLOCK_FACTORY_BYTE_OFFSET, (uint32_t *)&markers, 2);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     // Check for bad block markers
@@ -960,7 +960,7 @@ uint32_t mspi_nand_check_bad_block(uint32_t block_addr, bool *is_bad) {
  * Requires write to previously be enabled, and the spare location to equal 0xff
  * Caution: Not intended to be reversible!
  */
-uint32_t mspi_nand_mark_bad_block(uint32_t block_addr) {
+uint32_t nand_mark_bad_block(uint32_t block_addr) {
     bool busy = false, program_fail, erase_fail;
     uint32_t ui32Status, page_addr;
     uint8_t marker_value[] = {BAD_BLOCK_MARKER_VALUE}; // Needs to be array
@@ -975,26 +975,26 @@ uint32_t mspi_nand_mark_bad_block(uint32_t block_addr) {
      */
     page_addr = block_to_page_addr(block_addr);
     // Read page into cache
-    ui32Status = mspi_nand_cmd_page_read(page_addr);
+    ui32Status = nand_cmd_page_read(page_addr);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait until read completed
     do {
-        ui32Status = mspi_nand_get_busy(&busy);
+        ui32Status = nand_get_busy(&busy);
         if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     } while(busy);
 
     // Load marker value into our byte offset, within spare area
-    ui32Status = mspi_nand_cmd_program_load_random_x1(BAD_BLOCK_OUR_BYTE_OFFSET,
+    ui32Status = nand_cmd_program_load_random_x1(BAD_BLOCK_OUR_BYTE_OFFSET,
                                                       (uint32_t *)marker_value,
                                                       1);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Execute the write, write enable must be sent just before!
-    ui32Status = mspi_nand_write_enable();
+    ui32Status = nand_write_enable();
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
-    ui32Status = mspi_nand_cmd_program_execute(page_addr);
+    ui32Status = nand_cmd_program_execute(page_addr);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait for write to be completed, or error
-    ui32Status = mspi_nand_wait_busy(PROGRAM_TIME_MS, &program_fail, &erase_fail);
+    ui32Status = nand_wait_busy(PROGRAM_TIME_MS, &program_fail, &erase_fail);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     if (program_fail) return AM_HAL_STATUS_HW_ERR;
 
@@ -1007,13 +1007,13 @@ uint32_t mspi_nand_mark_bad_block(uint32_t block_addr) {
  * Can take a few hundred ms or so
  * FIXME: Why are we not finding any bad blocks?
  */
-uint32_t mspi_nand_print_bad_blocks(void) {
+uint32_t nand_print_bad_blocks(void) {
     bool is_bad;
     uint32_t ui32Status, total = 0;
 
     am_util_stdio_printf("Checking for Bad Blocks, addresses (decimal): \n");
     for (uint32_t i=0; i<NUM_BLOCKS; i++) {
-        ui32Status = mspi_nand_check_bad_block(i, &is_bad);
+        ui32Status = nand_check_bad_block(i, &is_bad);
         if (ui32Status != AM_HAL_STATUS_SUCCESS) {
             am_util_stdio_printf("Failed to read block %lu \n", i);
             return ui32Status;
@@ -1028,7 +1028,7 @@ uint32_t mspi_nand_print_bad_blocks(void) {
 }
 
 
-uint32_t mspi_nand_test(void) {
+uint32_t nand_test(void) {
     bool writable = false, busy = false, is_bad = false;
     uint8_t params_page[PARAMETER_PAGE_SIZE];
     uint8_t quad_params_page[PARAMETER_PAGE_SIZE];
@@ -1040,18 +1040,18 @@ uint32_t mspi_nand_test(void) {
 
 
     // Check for valid flash ID
-    RET_CHECK(mspi_nand_id());
+    RET_CHECK(nand_id());
 
     // Enable write and check if writable status is correct
-    RET_CHECK(mspi_nand_write_enable());
-    RET_CHECK(mspi_nand_get_writable(&writable));
+    RET_CHECK(nand_write_enable());
+    RET_CHECK(nand_get_writable(&writable));
     if (writable == false) {
         am_util_stdio_printf("Flash TEST: Writable status was not enabled! \n");
         return 1;
     }
     // Disable write and check if writable status is correct
-    RET_CHECK(mspi_nand_write_disable());
-    RET_CHECK(mspi_nand_get_writable(&writable));
+    RET_CHECK(nand_write_disable());
+    RET_CHECK(nand_get_writable(&writable));
     if (writable == true) {
         am_util_stdio_printf("Flash TEST: Writable status was not disabled! \n");
         return 1;
@@ -1061,14 +1061,14 @@ uint32_t mspi_nand_test(void) {
     // Test reading a page into cache
     // Should be immediately busy, then not busy after tRead
     // TODO: Check ECC?
-    RET_CHECK(mspi_nand_cmd_page_read(0xa5)); // Read block a5 = 165, chosen for pattern
-    RET_CHECK(mspi_nand_get_busy(&busy));
+    RET_CHECK(nand_cmd_page_read(0xa5)); // Read block a5 = 165, chosen for pattern
+    RET_CHECK(nand_get_busy(&busy));
     if(busy == false) {
         am_util_stdio_printf("Flash TEST: Flash is not busy immediately after CMD_READ_PAGE! \n");
         return 1;
     }
     am_util_delay_us(80); // tRD is 80uS max with ECC enabled
-    RET_CHECK(mspi_nand_get_busy(&busy));
+    RET_CHECK(nand_get_busy(&busy));
     if(busy == true) {
         am_util_stdio_printf("Flash TEST: Flash is still busy 80uS after CMD_READ_PAGE! \n");
         return 1;
@@ -1076,8 +1076,8 @@ uint32_t mspi_nand_test(void) {
 
     // Test writing a page into cache and reading it back. Do not actually program.
     for (int i=0;i<PAGE_SIZE;i++) {page_buffer[i] =i&0xff;} // Ascending bytes
-    mspi_nand_cmd_program_load_x1(0, (uint32_t *)page_buffer, PAGE_SIZE);
-    mspi_nand_cmd_read_x1(0, (uint32_t *)page_buffer, PAGE_SIZE);
+    nand_cmd_program_load_x1(0, (uint32_t *)page_buffer, PAGE_SIZE);
+    nand_cmd_read_x1(0, (uint32_t *)page_buffer, PAGE_SIZE);
     for (int i=0;i<PAGE_SIZE;i++) {
         if (page_buffer[i] != (i & 0xff)) {
             am_util_stdio_printf("Flash TEST: Read back wrong value from cache at %d, got %uud \n", 
@@ -1087,23 +1087,23 @@ uint32_t mspi_nand_test(void) {
     }
 
     // Test first block is not bad (should be good out of factory)
-    RET_CHECK(mspi_nand_check_bad_block(0, &is_bad));
+    RET_CHECK(nand_check_bad_block(0, &is_bad));
     if(is_bad) {
         am_util_stdio_printf("Flash TEST: Block 0 reads as bad, but should be good! \n");
         return AM_HAL_STATUS_FAIL;
     }
 
     // Read page from cache using x1 interface
-    // RET_CHECK(mspi_nand_cmd_read_x1(0x00, (uint32_t *)page_buffer, PAGE_SIZE));
+    // RET_CHECK(nand_cmd_read_x1(0x00, (uint32_t *)page_buffer, PAGE_SIZE));
 
     // Read params page using SPI
-    RET_CHECK(mspi_nand_read_params_page(params_page, PARAMETER_PAGE_SIZE, false));
+    RET_CHECK(nand_read_params_page(params_page, PARAMETER_PAGE_SIZE, false));
 
     // Print out parameters page without details for debugging
     RET_CHECK(onfi_print(params_page, PARAMETER_PAGE_SIZE, false));
 
     // Read params page using Quad IO
-    RET_CHECK(mspi_nand_read_params_page(quad_params_page, PARAMETER_PAGE_SIZE, true));
+    RET_CHECK(nand_read_params_page(quad_params_page, PARAMETER_PAGE_SIZE, true));
 
     // Check same
     if (memcmp(params_page, quad_params_page, PARAMETER_PAGE_SIZE) != 0) {

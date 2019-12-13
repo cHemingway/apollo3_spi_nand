@@ -12,7 +12,7 @@
 
 #include "SEGGER_RTT.h"
 
-#include "mspi_nand_flash.h"
+#include "nand_flash.h"
 
 // Test buffer to store pages in
 uint8_t write_page[PAGE_SIZE];
@@ -65,7 +65,7 @@ int main(void)
     printf("Starting Flash Tests \n");                  // Outputs over Segger RTT
 
     // Init flash and check was OK
-    retcode = mspi_nand_init(&pHandle);
+    retcode = nand_init(&pHandle);
     if (AM_DEVICES_MSPI_FLASH_STATUS_SUCCESS != retcode)
     {
         printf("Failed to configure the MSPI and Flash Device correctly!\n");
@@ -92,12 +92,12 @@ int main(void)
         uint32_t ret_code = 0;
         bool is_bad;
         printf("Marking block test... ");
-        ret_code = mspi_nand_check_bad_block(4, &is_bad);
+        ret_code = nand_check_bad_block(4, &is_bad);
         if (is_bad) {
             printf(" Already Marked! ");
         }
-        ret_code = mspi_nand_mark_bad_block(4); // Mark block 4 as bad, should fail
-        ret_code = mspi_nand_check_bad_block(4, &is_bad);
+        ret_code = nand_mark_bad_block(4); // Mark block 4 as bad, should fail
+        ret_code = nand_check_bad_block(4, &is_bad);
         if (is_bad) {
             printf(" Success \n");
         } else {
@@ -107,7 +107,7 @@ int main(void)
     }
     #endif
 
-    #if 1 // TEST_PROGRAM_BLOCK
+    #if TEST_PROGRAM_BLOCK
     {
         uint32_t ret_code;
         const uint32_t block_addr = 4;   // Block 4 is in gauranteed non-bad section
@@ -122,20 +122,20 @@ int main(void)
         }
 
         // Erase page and write value
-        ret_code = mspi_nand_erase_block(block_addr);
+        ret_code = nand_erase_block(block_addr);
         if (ret_code) {
             printf("Failed! Erase block returned %lu",ret_code);
         }
-        ret_code = mspi_nand_prog_page(page_addr, write_page);
+        ret_code = nand_prog_page(page_addr, write_page);
         if (ret_code) {
             printf("Failed! Prog page returned %lu",ret_code);
         }
 
         // Read page 0 in between to clear cache
-        ret_code = mspi_nand_read_page(0, 0, read_page, PAGE_SIZE, &ecc_err);
+        ret_code = nand_read_page(0, 0, read_page, PAGE_SIZE, &ecc_err);
 
         // Read back
-        ret_code = mspi_nand_read_page(page_addr, 0, read_page, PAGE_SIZE, &ecc_err);
+        ret_code = nand_read_page(page_addr, 0, read_page, PAGE_SIZE, &ecc_err);
         if (ret_code) {
             printf("Failed! Prog page returned %lu",ret_code);
         }
@@ -147,11 +147,10 @@ int main(void)
 
     }
     printf("Success! \n");
-    while(1);
     #endif
 
     while(1) {
-        retcode = mspi_nand_test();
+        retcode = nand_test();
         if (retcode == AM_HAL_STATUS_SUCCESS) {
             printf("FLASH TEST PASS \n\n");
             am_hal_gpio_output_set(AM_BSP_GPIO_LED0);
@@ -162,7 +161,7 @@ int main(void)
             am_hal_gpio_output_clear(AM_BSP_GPIO_LED0);
         }
 
-        mspi_nand_print_bad_blocks();
+        nand_print_bad_blocks();
         
         am_util_delay_ms(2000);
     }

@@ -190,7 +190,7 @@ INCLUDES+=
 # Compilation Units (Add all the .c files you need to compile)
 SRC=
 SRC+= main.c
-SRC+= mspi_nand_flash.c
+SRC+= nand_flash.c
 SRC+= onfi_print.c
 SRC+= startup_apollo3.s
 SRC+= am_util_delay.c
