@@ -71,8 +71,8 @@
 
 #define CMD_PROGRAM_LOAD        0x02
 #define CMD_PROGRAM_EXECUTE     0x10
-#define CMD_PROGRAM_RANDOM_SINGLE 0x84
-#define CMD_PROGRAM_RANDOM_QUAD 0x34
+#define CMD_PROGRAM_LOAD_RANDOM 0x84
+#define CMD_PROGRAM_LOAD_RANDOM_QUAD 0x34
 
 #define CMD_GET_FEATURES        0x0F
 #define CMD_SET_FEATURES        0x1F
@@ -719,6 +719,24 @@ static uint32_t mspi_nand_cmd_program_load_x1(uint16_t column_addr, uint32_t *da
     MSPI->CFG_b.TURNAROUND = 0;
 
     ui32Status = am_device_command_write(ui32Module, CMD_PROGRAM_LOAD, true, column_addr, data , data_len);
+
+    return ui32Status;
+}
+
+
+/* 
+ * Execute Random Data Program x1, writes to cache _without_ clearing it
+ */
+static uint32_t mspi_nand_cmd_program_load_random_x1(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
+    uint32_t ui32Status;
+
+    // Change to 2 byte addresses
+    MSPI->CFG_b.ASIZE = 0x01;   // Address is 2 bytes
+
+    // No turnaround, immediately send data
+    MSPI->CFG_b.TURNAROUND = 0;
+
+    ui32Status = am_device_command_write(ui32Module, CMD_PROGRAM_LOAD_RANDOM, true, column_addr, data , data_len);
 
     return ui32Status;
 }
