@@ -756,7 +756,7 @@ static uint32_t mspi_nand_cmd_block_erase(uint32_t page_addr) {
 
 
 // Check ECC status after page read
-static uint32_t mspi_nand_check_ecc(enum ecc_err_t *ecc_err) {
+static uint32_t mspi_nand_check_ecc(ecc_err_t *ecc_err) {
     uint32_t ui32Status;
     uint8_t status_reg = 0;
     ui32Status = mspi_nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
@@ -766,22 +766,22 @@ static uint32_t mspi_nand_check_ecc(enum ecc_err_t *ecc_err) {
     switch ((status_reg & FEATURE_REG_STATUS_ECC_MASK) >> FEATURE_REG_STATUS_ECC_SHIFT)
     {
         case FEATURE_REG_STATUS_ECC_NO_ERR:
-            ecc_err = ECC_OK;
+            *ecc_err = ECC_OK;
             break;
         case FEATURE_REG_STATUS_ECC_1_3_ERR:
-            ecc_err = ECC_CORRECTED;
+            *ecc_err = ECC_CORRECTED;
             break;
         case FEATURE_REG_STATUS_ECC_4_6_ERR:
-            ecc_err = ECC_SHOULD_REFRESH;
+            *ecc_err = ECC_SHOULD_REFRESH;
             break;
         case FEATURE_REG_STATUS_ECC_7_8_ERR:
-            ecc_err = ECC_MUST_REFRESH;
+            *ecc_err = ECC_MUST_REFRESH;
             break;
         case FEATURE_REG_STATUS_ECC_FATAL_ERR:
-            ecc_err = ECC_FATAL;
+            *ecc_err = ECC_FATAL;
             break;
         default: // Should never happen! Safest to assume data is corrupted
-            ecc_err = ECC_FATAL;
+            *ecc_err = ECC_FATAL;
             break;
     }
     #endif
@@ -841,6 +841,8 @@ uint32_t mspi_nand_read_page(uint32_t page_addr, uint16_t offset,
     mspi_nand_check_ecc(&ecc_err_detailed);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     *ecc_err = (ecc_err_detailed == ECC_FATAL);
+    // Success
+    return AM_HAL_STATUS_SUCCESS;
 }
 
 
