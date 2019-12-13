@@ -18,6 +18,8 @@
 #define CMD_PROGRAM_LOAD_RANDOM 0x84
 #define CMD_PROGRAM_LOAD_RANDOM_QUAD 0x34
 
+#define CMD_BLOCK_ERASE         0xD8
+
 #define CMD_GET_FEATURES        0x0F
 #define CMD_SET_FEATURES        0x1F
 

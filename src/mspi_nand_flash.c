@@ -741,6 +741,20 @@ static uint32_t mspi_nand_cmd_program_execute(uint32_t page_addr) {
     return ui32Status;
 }
 
+
+/*
+ * Execute BLOCK_ERASE to erase an entire block
+ */
+static uint32_t mspi_nand_cmd_block_erase(uint32_t page_addr) {
+    uint32_t ui32Status;
+
+    // Change to 3 byte addresses 
+    MSPI->CFG_b.ASIZE = 0x02;   // Address is 3 bytes
+    ui32Status = am_device_command_write(ui32Module, CMD_BLOCK_ERASE, true, page_addr, NULL, 0);
+    return ui32Status;
+}
+
+
 // Check ECC status after page read
 static uint32_t mspi_nand_check_ecc(enum ecc_err_t *ecc_err) {
     uint32_t ui32Status;
@@ -780,6 +794,26 @@ static uint32_t mspi_nand_check_ecc(enum ecc_err_t *ecc_err) {
 uint32_t mspi_nand_init_device(void) {
     // Unlock all blocks, as all are locked by default after power up
     return mspi_nand_cmd_set_features(FEATURE_REG_BLOCK_LOCK, FEATURE_REG_BLOCK_LOCK_UNLOCK_ALL);
+}
+
+
+/*
+ * Erase a block and checks status returned by chip
+ */
+uint32_t mspi_nand_erase_block(uint16_t block_addr) {
+    uint32_t ui32Status;
+    bool unused, erase_err;
+    // Enable write, as gets cleared by last program or erase_block function
+    ui32Status = mspi_nand_write_enable();
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Block erase command
+    ui32Status = mspi_nand_cmd_block_erase(block_to_page_addr(block_addr));
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Wait until not busy, check erase err, but ignore program error
+    ui32Status = mspi_nand_wait_busy(PAGE_READ_TIME_MS, &unused, &erase_err);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    if (erase_err) return AM_HAL_STATUS_HW_ERR;
+    return AM_HAL_STATUS_SUCCESS;
 }
 
 
