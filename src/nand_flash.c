@@ -557,8 +557,10 @@ static uint32_t nand_get_busy(bool *busy) {
 
 /*
  * Wait until NAND is no longer busy, indicates if program or erase failure occured
+ * status is pointer to raw status register, e.g. for checking ECC bits
  */
-static uint32_t nand_wait_busy(uint32_t timeout_ms, bool *program_fail, bool *erase_fail) {
+static uint32_t nand_wait_busy(uint32_t timeout_ms, bool *program_fail, bool *erase_fail,
+                               uint8_t *status) {
     bool        busy;
     uint32_t    ui32Status;
     uint8_t    status_reg;
@@ -580,6 +582,11 @@ static uint32_t nand_wait_busy(uint32_t timeout_ms, bool *program_fail, bool *er
     // Check bits
     *program_fail = (status_reg & FEATURE_REG_STATUS_P_FAIL_MASK) != 0;
     *erase_fail = (status_reg & FEATURE_REG_STATUS_E_FAIL_MASK) != 0;
+
+    // Return raw status reg
+    if (status != NULL) {
+        *status = status_reg;
+    }
 
     return ui32Status;
 }
@@ -759,37 +766,26 @@ static uint32_t nand_cmd_block_erase(uint32_t page_addr) {
 }
 
 
-// Check ECC status after page read
-static uint32_t nand_check_ecc(ecc_err_t *ecc_err) {
-    uint32_t ui32Status;
-    uint8_t status_reg = 0;
-    ui32Status = nand_cmd_get_features(FEATURE_REG_STATUS, &status_reg);
-
+// Get ECC bits from status register
+static ecc_err_t nand_status_to_ecc(uint8_t status_reg) {
     // Decode status reg into ECC error count, device specific
     #ifdef MICRON_MT29F8G01AD
     switch ((status_reg & FEATURE_REG_STATUS_ECC_MASK) >> FEATURE_REG_STATUS_ECC_SHIFT)
     {
         case FEATURE_REG_STATUS_ECC_NO_ERR:
-            *ecc_err = ECC_OK;
-            break;
+            return ECC_OK;
         case FEATURE_REG_STATUS_ECC_1_3_ERR:
-            *ecc_err = ECC_CORRECTED;
-            break;
+            return ECC_CORRECTED;
         case FEATURE_REG_STATUS_ECC_4_6_ERR:
-            *ecc_err = ECC_SHOULD_REFRESH;
-            break;
+            return ECC_SHOULD_REFRESH;
         case FEATURE_REG_STATUS_ECC_7_8_ERR:
-            *ecc_err = ECC_MUST_REFRESH;
-            break;
+            return ECC_MUST_REFRESH;
         case FEATURE_REG_STATUS_ECC_FATAL_ERR:
-            *ecc_err = ECC_FATAL;
-            break;
+            return ECC_FATAL;
         default: // Should never happen! Safest to assume data is corrupted
-            *ecc_err = ECC_FATAL;
-            break;
+            return ECC_FATAL;
     }
     #endif
-    return ui32Status;
 }
 
 /*
@@ -814,7 +810,7 @@ uint32_t nand_erase_block(uint16_t block_addr) {
     ui32Status = nand_cmd_block_erase(block_to_page_addr(block_addr));
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait until not busy, check erase err, but ignore program error
-    ui32Status = nand_wait_busy(PAGE_READ_TIME_MS, &unused, &erase_err);
+    ui32Status = nand_wait_busy(PAGE_READ_TIME_MS, &unused, &erase_err, NULL);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     if (erase_err) return AM_HAL_STATUS_HW_ERR;
     return AM_HAL_STATUS_SUCCESS;
@@ -838,7 +834,7 @@ uint32_t nand_prog_page(uint32_t page_addr, uint8_t data[]) {
     ui32Status = nand_cmd_program_execute(page_addr);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait for write to be completed, or error
-    ui32Status = nand_wait_busy(PROGRAM_TIME_MS, &program_fail, &erase_fail);
+    ui32Status = nand_wait_busy(PROGRAM_TIME_MS, &program_fail, &erase_fail, NULL);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     if (program_fail) return AM_HAL_STATUS_HW_ERR;
 
@@ -848,28 +844,29 @@ uint32_t nand_prog_page(uint32_t page_addr, uint8_t data[]) {
 
 /*
  * Read a portion of a page
- * Sets ecc_err if an uncorrectable ECC error occurred (correctable is ignored)
+ * Sets ecc_fatal if an uncorrectable ECC error occurred (correctable is ignored)
  */
 uint32_t nand_read_page(uint32_t page_addr, uint16_t offset, 
                              uint8_t *data, uint32_t len, 
-                             bool *ecc_err) {
+                             bool *ecc_fatal) {
     uint32_t ui32Status;
     bool ignore1, ignore2;
-    ecc_err_t ecc_err_detailed;
+    uint8_t status_reg;
+    ecc_err_t ecc_err;
 
     // Issue page read command
     ui32Status = nand_cmd_page_read(page_addr);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait for completion
-    ui32Status = nand_wait_busy(PAGE_READ_TIME_MS, &ignore1, &ignore2);
+    ui32Status = nand_wait_busy(PAGE_READ_TIME_MS, &ignore1, &ignore2, &status_reg);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Check ECC error. TODO: ECC error counters
+    ecc_err = nand_status_to_ecc(status_reg);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    *ecc_fatal = (ecc_err == ECC_FATAL);
     // Read out the data at offset
     ui32Status = nand_cmd_read_x1(offset, (uint32_t *)data, len);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
-    // Check ECC error. TODO: ECC error counters
-    nand_check_ecc(&ecc_err_detailed);
-    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
-    *ecc_err = (ecc_err_detailed == ECC_FATAL);
     // Success
     return AM_HAL_STATUS_SUCCESS;
 }
@@ -994,7 +991,7 @@ uint32_t nand_mark_bad_block(uint32_t block_addr) {
     ui32Status = nand_cmd_program_execute(page_addr);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait for write to be completed, or error
-    ui32Status = nand_wait_busy(PROGRAM_TIME_MS, &program_fail, &erase_fail);
+    ui32Status = nand_wait_busy(PROGRAM_TIME_MS, &program_fail, &erase_fail, NULL);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     if (program_fail) return AM_HAL_STATUS_HW_ERR;
 
