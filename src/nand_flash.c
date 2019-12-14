@@ -577,7 +577,12 @@ static uint32_t nand_wait_busy(uint32_t timeout_ms, bool *program_fail, bool *er
             break;      // Exit loop early so we don't have delay if busy==false
         }
         am_util_delay_ms(1);
-    } while (--timeout_ms);
+    } while (timeout_ms--);
+
+    // Check if we timed out
+    if (timeout_ms == 0) {
+        return AM_HAL_STATUS_TIMEOUT;
+    }
 
     // Check bits
     *program_fail = (status_reg & FEATURE_REG_STATUS_P_FAIL_MASK) != 0;
