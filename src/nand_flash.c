@@ -830,6 +830,9 @@ uint32_t nand_prog_page(uint32_t page_addr, uint8_t data[]) {
     bool program_fail, erase_fail;
     uint32_t ui32Status;
 
+    // Write enable must be sent before program load and program execute
+    ui32Status = nand_write_enable();
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Load marker value into our byte offset, within spare area
     ui32Status = nand_cmd_program_load_x1(0, (uint32_t *)data, PAGE_SIZE);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
@@ -962,13 +965,13 @@ uint32_t nand_mark_bad_block(uint32_t block_addr) {
         if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     } while(busy);
 
+    // Execute the write, write enable must be sent before program load
+    ui32Status = nand_write_enable();
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Load marker value into our byte offset, within spare area
     ui32Status = nand_cmd_program_load_random_x1(BAD_BLOCK_OUR_BYTE_OFFSET,
                                                       (uint32_t *)marker_value,
                                                       1);
-    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
-    // Execute the write, write enable must be sent just before!
-    ui32Status = nand_write_enable();
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     ui32Status = nand_cmd_program_execute(page_addr);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
