@@ -88,6 +88,7 @@ int main(void)
     }
 
     #if TEST_MARK_BLOCK
+    // FIXME: Block 5 is detected as bad, why?
     {
         uint32_t ret_code = 0;
         bool is_bad;
@@ -99,11 +100,16 @@ int main(void)
         ret_code = nand_mark_bad_block(4); // Mark block 4 as bad, should fail
         ret_code = nand_check_bad_block(4, &is_bad);
         if (is_bad) {
-            printf(" Success \n");
+            printf(" Success marked as bad \n");
         } else {
             printf(" Failed! Block not marked as bad, or read incorrectly! \n");
         }
-
+        for (int i=0; i<8; i++) {
+            ret_code = nand_check_bad_block(i, &is_bad);
+            if (is_bad && (i!=4)) {
+                printf(" Failed! Extra block %d marked as bad! \n", i);
+            }
+        }
     }
     #endif
 
