@@ -55,9 +55,9 @@
 #define nand_ID_MASK  0xfeff  // Allow both 0x2c46 (3.3V) and 0x2c47 (1.8V)
 
 #define RESET_TIME_MS 1 // Takes 565uS to reset, round up to 1ms
-#define ERASE_TIME_MS       10  // Max time to erase a block
-#define PROGRAM_TIME_MS     1   // Max time to program a page, 600uS
-#define PAGE_READ_TIME_MS   1   // Max time to read a page, 80uS
+#define ERASE_TIME_US       10000  // Max time to erase a block
+#define PROGRAM_TIME_US     600   // Max time to program a page
+#define PAGE_READ_TIME_US   80   // Max time to read a page, with ECC enabled
 
 #define DEVICE_PAGE_SIZE      (2*1024)  // Page is 2K Data
 #define METADATA_SIZE          128      // 128 bytes of user + ecc data

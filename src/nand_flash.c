@@ -61,7 +61,15 @@
 // Disable warning for unused functions in this file
 #pragma GCC diagnostic ignored "-Wunused-function"
 
-#define AM_DEVICES_MSPI_FLASH_TIMEOUT             1000000
+
+// Timeout for MSPI HAL read/write acesses in microseconds
+// Set to 10mS as flash should respond immediately
+#define AM_DEVICES_MSPI_FLASH_TIMEOUT             10000
+
+ // Time to wait in uS between polling the flash device status reg
+ // Should be ~10x larger than execution time to ensure 90% accurate timing.
+ // HAL has ~1uS delay minimum (due to polling loop), so 10uS sounds good
+const uint32_t POLL_DELAY_US =                    10;
 
 #ifdef MICRON_MT29F8G01AD
 
@@ -559,11 +567,12 @@ static uint32_t nand_get_busy(bool *busy) {
  * Wait until NAND is no longer busy, indicates if program or erase failure occured
  * status is pointer to raw status register, e.g. for checking ECC bits
  */
-static uint32_t nand_wait_busy(uint32_t timeout_ms, bool *program_fail, bool *erase_fail,
+static uint32_t nand_wait_busy(uint32_t timeout_us, bool *program_fail, bool *erase_fail,
                                uint8_t *status) {
     bool        busy;
     uint32_t    ui32Status;
     uint8_t    status_reg;
+    int32_t    timeout_count = timeout_us; // Convert to integer so can go negative
 
     do {
         // Get the status register
@@ -576,11 +585,12 @@ static uint32_t nand_wait_busy(uint32_t timeout_ms, bool *program_fail, bool *er
         if (!busy) {
             break;      // Exit loop early so we don't have delay if busy==false
         }
-        am_util_delay_ms(1);
-    } while (timeout_ms--);
+        am_util_delay_us(POLL_DELAY_US);
+        timeout_count -= POLL_DELAY_US;
+    } while (timeout_count>0);
 
     // Check if we timed out
-    if (busy & (timeout_ms <= 0)) {
+    if (busy & (timeout_count <= 0)) {
         return AM_HAL_STATUS_TIMEOUT;
     }
 
@@ -815,7 +825,7 @@ uint32_t nand_erase_block(uint16_t block_addr) {
     ui32Status = nand_cmd_block_erase(block_to_page_addr(block_addr));
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait until not busy, check erase err, but ignore program error
-    ui32Status = nand_wait_busy(PAGE_READ_TIME_MS, &unused, &erase_err, NULL);
+    ui32Status = nand_wait_busy(ERASE_TIME_US, &unused, &erase_err, NULL);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     if (erase_err) return AM_HAL_STATUS_HW_ERR;
     return AM_HAL_STATUS_SUCCESS;
@@ -842,7 +852,7 @@ uint32_t nand_prog_page(uint32_t page_addr, uint8_t data[]) {
     ui32Status = nand_cmd_program_execute(page_addr);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait for write to be completed, or error
-    ui32Status = nand_wait_busy(PROGRAM_TIME_MS, &program_fail, &erase_fail, NULL);
+    ui32Status = nand_wait_busy(PROGRAM_TIME_US, &program_fail, &erase_fail, NULL);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     if (program_fail) return AM_HAL_STATUS_HW_ERR;
 
@@ -866,7 +876,7 @@ uint32_t nand_read_page(uint32_t page_addr, uint16_t offset,
     ui32Status = nand_cmd_page_read(page_addr);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait for completion
-    ui32Status = nand_wait_busy(PAGE_READ_TIME_MS, &ignore1, &ignore2, &status_reg);
+    ui32Status = nand_wait_busy(PAGE_READ_TIME_US, &ignore1, &ignore2, &status_reg);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Check ECC error. TODO: ECC error counters
     ecc_err = nand_status_to_ecc(status_reg);
@@ -979,7 +989,7 @@ uint32_t nand_mark_bad_block(uint32_t block_addr) {
     ui32Status = nand_cmd_program_execute(page_addr);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Wait for write to be completed, or error
-    ui32Status = nand_wait_busy(PROGRAM_TIME_MS, &program_fail, &erase_fail, NULL);
+    ui32Status = nand_wait_busy(PROGRAM_TIME_US, &program_fail, &erase_fail, NULL);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     if (program_fail) return AM_HAL_STATUS_HW_ERR;
 
