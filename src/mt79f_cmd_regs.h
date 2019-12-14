@@ -77,3 +77,7 @@
 #define BAD_BLOCK_OUR_BYTE_OFFSET     4 // Put our marker in User Meta Data II
 #define BAD_BLOCK_AREA_LENGTH ((BAD_BLOCK_OUR_BYTE_OFFSET - BAD_BLOCK_FACTORY_BYTE_OFFSET) + 1)
 #define BAD_BLOCK_MARKER_VALUE  0x00    // 0x00 = bad block. 
+
+#define ECC_AREA_OFFSET         0x840   // Start of ECC data area, read only
+#define ECC_AREA_LENGTH         64      // 0x87F - 0x840
+#define ECC_UNPROGRAMMED_VALUE  0xFF    // ECC has not been set, therefore unwritten

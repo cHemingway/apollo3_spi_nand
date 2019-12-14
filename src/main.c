@@ -151,6 +151,16 @@ int main(void)
             printf("Failed! Read vs Written does not match.");
         }
 
+        // Check is not marked as free now it has been erased
+        bool is_free;
+        ret_code = nand_is_free(page_addr, &is_free);
+        if (ret_code) {
+            printf("Error, is_free returned %lu \n", ret_code);
+        }
+        if (is_free) {
+            printf("Error, is_free shows programmed page as free! \n");
+        }
+
     }
     printf("Success! \n");
     #endif

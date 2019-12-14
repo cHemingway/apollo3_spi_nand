@@ -861,6 +861,41 @@ uint32_t nand_prog_page(uint32_t page_addr, uint8_t data[]) {
 
 
 /*
+ * Check that the given page has been erased. 
+ * Sets is_free to true if so, false if not
+ */
+uint32_t nand_is_free(uint32_t page_addr, bool *is_free) {
+    uint32_t ui32Status;
+
+    uint8_t ecc_data[ECC_AREA_LENGTH]; 
+    
+    /* We check if a page is free by reading the ECC data from the main/spare area
+     * If it is all 0xFF, then it is extremely likely that the page has not been programmed
+     * The chance of it all being 0xFF by coincidence is 1 / 2^(ECC_AREA_LENGTH)
+     * TODO: Check this does not occur for all zero data
+     */
+
+    // Don't check ECC in status reg on read, as the ECC bits are not themselves ECC protected
+    ui32Status = nand_read_page(page_addr, ECC_AREA_OFFSET, ecc_data, 
+                                ECC_AREA_LENGTH, NULL);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+
+    if (is_free != NULL) {
+        *is_free = true;
+        // Check if free by testing every byte against unprogrammed value
+        // We could speed this up by checking 32 bits at a time
+        for(int i=0; i<ECC_AREA_LENGTH; i++) {
+            if (ecc_data[i] != ECC_UNPROGRAMMED_VALUE) {
+                *is_free = false;
+            }
+        }
+    } 
+    // Success
+    return AM_HAL_STATUS_SUCCESS;
+}
+
+
+/*
  * Read a portion of a page
  * Sets ecc_fatal if an uncorrectable ECC error occurred (correctable is ignored)
  */
@@ -1097,13 +1132,22 @@ uint32_t nand_test(void) {
     // Print out parameters page without details for debugging
     RET_CHECK(onfi_print(params_page, PARAMETER_PAGE_SIZE, false));
 
-    // Read params page using Quad IO
-    RET_CHECK(nand_read_params_page(quad_params_page, PARAMETER_PAGE_SIZE, true));
+    #if NAND_USE_QUAD
+        // Read params page using Quad IO
+        RET_CHECK(nand_read_params_page(quad_params_page, PARAMETER_PAGE_SIZE, true));
 
-    // Check same
-    if (memcmp(params_page, quad_params_page, PARAMETER_PAGE_SIZE) != 0) {
-        am_util_stdio_printf("Flash TEST: Read x1 and Read Quad I/O get different parameter page! \n");
-        return AM_HAL_STATUS_FAIL;
+        // Check same
+        if (memcmp(params_page, quad_params_page, PARAMETER_PAGE_SIZE) != 0) {
+            am_util_stdio_printf("Flash TEST: Read x1 and Read Quad I/O get different parameter page! \n");
+            return AM_HAL_STATUS_FAIL;
+        }
+    #endif
+
+    // Check 1st page is free, should be by default
+    bool is_free;
+    RET_CHECK(nand_is_free(0, &is_free));
+    if (!is_free) {
+        am_util_stdio_printf("FLASH TEST: Page 0 does not read as free! \n");
     }
 
     #undef RET_CHECK

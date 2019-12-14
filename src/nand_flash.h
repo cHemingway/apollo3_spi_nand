@@ -44,6 +44,8 @@ uint32_t nand_erase_block(uint16_t block_addr);
 
 uint32_t nand_prog_page(uint32_t page_addr, uint8_t data[]);
 
+uint32_t nand_is_free(uint32_t page_addr, bool *is_free);
+
 uint32_t nand_read_page(uint32_t page, uint16_t offset, 
                              uint8_t *data, uint32_t len, 
                              bool *ecc_err);
