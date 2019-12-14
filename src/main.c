@@ -88,17 +88,23 @@ int main(void)
     }
 
     #if TEST_MARK_BLOCK
-    // FIXME: Block 5 is detected as bad, why?
+    // FIXME: Block n+1 is detected as bad, why?
     {
         uint32_t ret_code = 0;
         bool is_bad;
+        const int marked_block = 5; // Mark block 5
+        
+        // Erase block before marking
+        ret_code = nand_erase_block(marked_block);
+
         printf("Marking block test... ");
-        ret_code = nand_check_bad_block(4, &is_bad);
+        ret_code = nand_check_bad_block(marked_block, &is_bad);
         if (is_bad) {
             printf(" Already Marked! ");
         }
-        ret_code = nand_mark_bad_block(4); // Mark block 4 as bad, should fail
-        ret_code = nand_check_bad_block(4, &is_bad);
+        // Mark the block and check it is marked correctly
+        ret_code = nand_mark_bad_block(marked_block); 
+        ret_code = nand_check_bad_block(marked_block, &is_bad);
         if (is_bad) {
             printf(" Success marked as bad \n");
         } else {
@@ -106,14 +112,14 @@ int main(void)
         }
         for (int i=0; i<8; i++) {
             ret_code = nand_check_bad_block(i, &is_bad);
-            if (is_bad && (i!=4)) {
+            if (is_bad && (i!=marked_block)) {
                 printf(" Failed! Extra block %d marked as bad! \n", i);
             }
         }
     }
     #endif
 
-    #if TEST_PROGRAM_BLOCK
+    #if 1 // TEST_PROGRAM_BLOCK
     {
         uint32_t ret_code;
         const uint32_t block_addr = 4;   // Block 4 is in gauranteed non-bad section
@@ -160,6 +166,30 @@ int main(void)
         if (is_free) {
             printf("Error, is_free shows programmed page as free! \n");
         }
+
+        // Copy to next page, since its erased
+        printf("Copy page test: ");
+        bool ecc_fatal;
+        ret_code = nand_copy_page(page_addr, page_addr+1, &ecc_fatal);
+        if (ret_code) {
+            printf("Error, nand_copy_page returned %lu \n", ret_code);
+        }
+        if (ecc_fatal) {
+            printf("Got fatal ECC error");
+        }
+
+        // Read back from page+1 to check copy_page worked
+        ret_code = nand_read_page(page_addr+1, 0, read_page, PAGE_SIZE, &ecc_err);
+        if (ret_code) {
+            printf("Failed! Prog page returned %lu",ret_code);
+        }
+
+        // Check read correctly
+        if(0 != memcmp(read_page, write_page, PAGE_SIZE)) {
+            printf("Failed! Read vs Written does not match.");
+        }
+        
+
 
     }
     printf("Success! \n");

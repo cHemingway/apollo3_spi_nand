@@ -928,6 +928,48 @@ uint32_t nand_read_page(uint32_t page_addr, uint16_t offset,
 
 
 /*
+ * Copy a page from one address to another.
+ * Takes source and destination address, and detects if an ECC error occured.
+ * Uses flash devices internal cache for speed.
+ */
+uint32_t nand_copy_page(uint32_t src_page_addr, uint32_t dest_page_addr, bool *ecc_fatal) {
+    uint32_t ui32Status;
+    bool unused1, unused2;
+    uint8_t status_reg;
+    ecc_err_t ecc_err;
+
+    /*
+     * Following INTERNAL_DATA_MOVE sequence of Micron MT79A
+     */
+    ui32Status = nand_cmd_page_read(src_page_addr);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Not mentioned in datasheet if checking status reg is needed here
+    // However otherwise, we would not get ECC status
+    // TODO: Check status reg at end for ECC errors
+    ui32Status = nand_wait_busy(PAGE_READ_TIME_US, &unused1, &unused2, &status_reg);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    ecc_err = nand_status_to_ecc(status_reg);
+    if ((ecc_err == ECC_FATAL) && (ecc_fatal != NULL)) {
+        *ecc_fatal = true;
+        return AM_HAL_STATUS_HW_ERR; // Exit early on ECC fail
+    }
+    // Enable write, must be called before program ops
+    ui32Status = nand_write_enable();
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // PROGRAM_LOAD_RANDOM_DATA with no data, bit unclear if nescessary
+    ui32Status = nand_cmd_program_load_random_x1(0, NULL, 0);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Finally, write out the page
+    ui32Status = nand_cmd_program_execute(dest_page_addr);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    ui32Status = nand_wait_busy(PROGRAM_TIME_US, &unused1, &unused2, &status_reg);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Success!
+    return AM_HAL_STATUS_SUCCESS;
+}
+
+
+/*
  * Read the parameter page (blocking) from the flash into *params_page of size len
  * Len must be > PARAMETER_PAGE_SIZE
  */

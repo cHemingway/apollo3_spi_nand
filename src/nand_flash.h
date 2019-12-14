@@ -50,6 +50,9 @@ uint32_t nand_read_page(uint32_t page, uint16_t offset,
                              uint8_t *data, uint32_t len, 
                              bool *ecc_err);
 
+uint32_t nand_copy_page(uint32_t src_page_addr, uint32_t dest_page_addr, 
+                        bool *ecc_fatal);
+
 /* After init, run this to test all features */
 uint32_t nand_test(void);
 
