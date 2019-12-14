@@ -871,7 +871,9 @@ uint32_t nand_read_page(uint32_t page_addr, uint16_t offset,
     // Check ECC error. TODO: ECC error counters
     ecc_err = nand_status_to_ecc(status_reg);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    if (ecc_fatal != NULL) {
     *ecc_fatal = (ecc_err == ECC_FATAL);
+    }
     // Read out the data at offset
     ui32Status = nand_cmd_read_x1(offset, (uint32_t *)data, len);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
