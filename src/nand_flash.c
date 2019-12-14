@@ -920,7 +920,7 @@ uint32_t nand_read_params_page(uint8_t *params_page, uint32_t len, bool use_quad
 
 uint32_t nand_check_bad_block(uint32_t block_addr, bool *is_bad) {
     uint32_t ui32Status, page_addr;
-    uint8_t markers[2];
+    uint8_t markers[BAD_BLOCK_AREA_LENGTH];
 
     // Convert block addr into page addr (get first page)
     page_addr = block_to_page_addr(block_addr);
@@ -928,12 +928,13 @@ uint32_t nand_check_bad_block(uint32_t block_addr, bool *is_bad) {
     // Read two bytes at marker address of first byte. One factory, one ours
     // We ignore ECC as won't be set for a bad block
     ui32Status = nand_read_page(page_addr + BAD_BLOCK_PAGE_OFFSET, 
-                                BAD_BLOCK_FACTORY_BYTE_OFFSET,
-                                markers, 2, NULL); 
+                                BAD_BLOCK_AREA_OFFSET,
+                                markers, BAD_BLOCK_AREA_LENGTH, NULL); 
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     // Check for bad block markers
-    *is_bad = (markers[0] == BAD_BLOCK_MARKER_VALUE) || (markers[1] == BAD_BLOCK_MARKER_VALUE);
+    *is_bad = ((markers[BAD_BLOCK_OUR_BYTE_OFFSET]     == BAD_BLOCK_MARKER_VALUE) || 
+               (markers[BAD_BLOCK_FACTORY_BYTE_OFFSET] == BAD_BLOCK_MARKER_VALUE));
     // Success
     return ui32Status;
 }
@@ -971,7 +972,7 @@ uint32_t nand_mark_bad_block(uint32_t block_addr) {
     ui32Status = nand_write_enable();
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
     // Load marker value into our byte offset, within spare area
-    ui32Status = nand_cmd_program_load_random_x1(BAD_BLOCK_OUR_BYTE_OFFSET,
+    ui32Status = nand_cmd_program_load_random_x1(BAD_BLOCK_AREA_OFFSET + BAD_BLOCK_OUR_BYTE_OFFSET,
                                                       (uint32_t *)marker_value,
                                                       1);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;

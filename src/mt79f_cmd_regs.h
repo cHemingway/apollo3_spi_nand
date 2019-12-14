@@ -72,6 +72,8 @@
 #define PARAMETER_PAGE_COLUMN_ADDR 0x00 // Parameter table starts at column 0x00
 
 #define BAD_BLOCK_PAGE_OFFSET 0x00      // Page within block that bad block marking is in
-#define BAD_BLOCK_FACTORY_BYTE_OFFSET 2048      // Byte address of factory bad block marker
-#define BAD_BLOCK_OUR_BYTE_OFFSET 2049          // Byte address of our bad block marker
-#define BAD_BLOCK_MARKER_VALUE  0x00    // 0x00 in byte 2048 (1st spare) = bad block     
+#define BAD_BLOCK_AREA_OFFSET 0x800     // Start of spare area
+#define BAD_BLOCK_FACTORY_BYTE_OFFSET 0 // Factory marker is at start of spare area
+#define BAD_BLOCK_OUR_BYTE_OFFSET     4 // Put our marker in User Meta Data II
+#define BAD_BLOCK_AREA_LENGTH ((BAD_BLOCK_OUR_BYTE_OFFSET - BAD_BLOCK_FACTORY_BYTE_OFFSET) + 1)
+#define BAD_BLOCK_MARKER_VALUE  0x00    // 0x00 = bad block. 
