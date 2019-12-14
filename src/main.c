@@ -177,7 +177,11 @@ int main(void)
             am_hal_gpio_output_clear(AM_BSP_GPIO_LED0);
         }
 
+        uint32_t duration, start_time = g_tick_ms;
         nand_print_bad_blocks();
+        duration = g_tick_ms - start_time;
+        printf("Took %lu ms, %lu blocks/second \n",duration, 
+                        (uint32_t)(NUM_BLOCKS/((float)duration * 0.001f)));
         
         am_util_delay_ms(2000);
     }
