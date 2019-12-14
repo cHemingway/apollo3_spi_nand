@@ -67,7 +67,7 @@
 
 
 // NAND Flash device configuration structure
-am_hal_mspi_dev_config_t  g_psMSPISettings =
+am_hal_mspi_dev_config_t  g_psMSPISettings = 
 {
     .eSpiMode             = AM_HAL_MSPI_SPI_MODE_0, // See micron datasheet
     .eClockFreq           = AM_HAL_MSPI_CLK_6MHZ,
@@ -580,7 +580,7 @@ static uint32_t nand_wait_busy(uint32_t timeout_ms, bool *program_fail, bool *er
     } while (timeout_ms--);
 
     // Check if we timed out
-    if (timeout_ms == 0) {
+    if (busy & (timeout_ms <= 0)) {
         return AM_HAL_STATUS_TIMEOUT;
     }
 
