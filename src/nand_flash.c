@@ -879,7 +879,6 @@ uint32_t nand_read_page(uint32_t page_addr, uint16_t offset,
 uint32_t nand_read_params_page(uint8_t *params_page, uint32_t len, bool use_quad) {
     uint32_t ui32Status;
     uint8_t  reg_config, old_reg_config;
-    bool busy = true;
 
     // Check length parameter
     if (len < PARAMETER_PAGE_SIZE) {
@@ -893,29 +892,16 @@ uint32_t nand_read_params_page(uint8_t *params_page, uint32_t len, bool use_quad
     reg_config = old_reg_config & ~FEATURE_REG_CONFIG_CFG_MASK; // Clear CFG bits
     reg_config |= FEATURE_REG_CONFIG_CFG_VALUE_READ_PARAMS;     // Set CFG to VALUE_READ_PARAMS, 010
 
-    nand_cmd_set_features(FEATURE_REG_CONFIG, reg_config);
+    ui32Status = nand_cmd_set_features(FEATURE_REG_CONFIG, reg_config);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
-    // Read params page into cache. We can't use read_page as no ECC here
-    ui32Status = nand_cmd_page_read(PARAMETER_PAGE_PAGE_ADDR);
-    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
-
-    // Spin until completed
-    while(busy) {
-        ui32Status = nand_get_busy(&busy);
+    // Read parameter page. ECC is not used for this page, see datasheet.
+    ui32Status = nand_read_page(PARAMETER_PAGE_PAGE_ADDR, PARAMETER_PAGE_COLUMN_ADDR,
+                   params_page, len, NULL); 
         if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
-    }
-
-    // Read out params page from cache
-    if (use_quad) {
-        ui32Status = nand_cmd_read_quadio(PARAMETER_PAGE_COLUMN_ADDR, (uint32_t *)params_page, len);
-    } else {
-        ui32Status = nand_cmd_read_x1(PARAMETER_PAGE_COLUMN_ADDR, (uint32_t *)params_page, len);
-    }
-    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     // Write original value back to old_reg_config to exit parameter page reading mode
-    nand_cmd_set_features(FEATURE_REG_CONFIG, old_reg_config);
+    ui32Status = nand_cmd_set_features(FEATURE_REG_CONFIG, old_reg_config);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     return AM_HAL_STATUS_SUCCESS; // Return success
@@ -925,24 +911,15 @@ uint32_t nand_read_params_page(uint8_t *params_page, uint32_t len, bool use_quad
 uint32_t nand_check_bad_block(uint32_t block_addr, bool *is_bad) {
     uint32_t ui32Status, page_addr;
     uint8_t markers[2];
-    bool busy = true;
 
     // Convert block addr into page addr (get first page)
     page_addr = block_to_page_addr(block_addr);
 
-     // Read params page into cache
-    ui32Status = nand_cmd_page_read(page_addr + BAD_BLOCK_PAGE_OFFSET);
-    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
-
-    // Spin until completed
-    // TODO: Timeout
-    do {
-        ui32Status = nand_get_busy(&busy);
-        if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
-    } while (busy==true);
-
-    // Read out two bytes at marker address, one factory, one ours
-    ui32Status = nand_cmd_read_x1(BAD_BLOCK_FACTORY_BYTE_OFFSET, (uint32_t *)&markers, 2);
+    // Read two bytes at marker address of first byte. One factory, one ours
+    // We ignore ECC as won't be set for a bad block
+    ui32Status = nand_read_page(page_addr + BAD_BLOCK_PAGE_OFFSET, 
+                                BAD_BLOCK_FACTORY_BYTE_OFFSET,
+                                markers, 2, NULL); 
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     // Check for bad block markers
