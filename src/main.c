@@ -14,9 +14,14 @@
 
 #include "nand_flash.h"
 
-// Test buffer to store pages in
-uint8_t write_page[PAGE_SIZE];
-uint8_t read_page[PAGE_SIZE];
+
+#ifndef TEST_BLOCK
+#define TEST_BLOCK      true
+#endif
+
+#ifndef TEST_PROGRAM
+#define TEST_PROGRAM    true
+#endif
 
 // Override am_print_string so hard_fault_handler outputs over RTT
 void am_print_string(char *pcStr) {
@@ -87,116 +92,8 @@ int main(void)
         am_hal_gpio_pinconfig(AM_BSP_GPIO_MSPI_CE0, GPIO_MSPI_CE0);
     }
 
-    #if TEST_MARK_BLOCK
-    // FIXME: Block n+1 is detected as bad, why?
-    {
-        uint32_t ret_code = 0;
-        bool is_bad;
-        const int marked_block = 5; // Mark block 5
-        
-        // Erase block before marking
-        ret_code = nand_erase_block(marked_block);
-
-        printf("Marking block test... ");
-        ret_code = nand_check_bad_block(marked_block, &is_bad);
-        if (is_bad) {
-            printf(" Already Marked! ");
-        }
-        // Mark the block and check it is marked correctly
-        ret_code = nand_mark_bad_block(marked_block); 
-        ret_code = nand_check_bad_block(marked_block, &is_bad);
-        if (is_bad) {
-            printf(" Success marked as bad \n");
-        } else {
-            printf(" Failed! Block not marked as bad, or read incorrectly! \n");
-        }
-        for (int i=0; i<8; i++) {
-            ret_code = nand_check_bad_block(i, &is_bad);
-            if (is_bad && (i!=marked_block)) {
-                printf(" Failed! Extra block %d marked as bad! \n", i);
-            }
-        }
-    }
-    #endif
-
-    #if 1 // TEST_PROGRAM_BLOCK
-    {
-        uint32_t ret_code;
-        const uint32_t block_addr = 4;   // Block 4 is in gauranteed non-bad section
-        const uint32_t page_addr = block_addr*PAGES_PER_BLOCK;
-        bool ecc_err;
-
-        printf("Block erase and reprogram test \n");
-
-        // Generate Data
-        for (int i=0; i<PAGE_SIZE; i++) {
-            write_page[i] = ((i&0xf) << 4) | (i&0xf); // generate 00, 11, 22, 33 etc
-        }
-
-        // Erase page and write value
-        ret_code = nand_erase_block(block_addr);
-        if (ret_code) {
-            printf("Failed! Erase block returned %lu",ret_code);
-        }
-        ret_code = nand_prog_page(page_addr, write_page);
-        if (ret_code) {
-            printf("Failed! Prog page returned %lu",ret_code);
-        }
-
-        // Read page 0 in between to clear cache
-        ret_code = nand_read_page(0, 0, read_page, PAGE_SIZE, &ecc_err);
-
-        // Read back
-        ret_code = nand_read_page(page_addr, 0, read_page, PAGE_SIZE, &ecc_err);
-        if (ret_code) {
-            printf("Failed! Prog page returned %lu",ret_code);
-        }
-
-        // Check read correctly
-        if(0 != memcmp(read_page, write_page, PAGE_SIZE)) {
-            printf("Failed! Read vs Written does not match.");
-        }
-
-        // Check is not marked as free now it has been erased
-        bool is_free;
-        ret_code = nand_is_free(page_addr, &is_free);
-        if (ret_code) {
-            printf("Error, is_free returned %lu \n", ret_code);
-        }
-        if (is_free) {
-            printf("Error, is_free shows programmed page as free! \n");
-        }
-
-        // Copy to next page, since its erased
-        printf("Copy page test: ");
-        bool ecc_fatal;
-        ret_code = nand_copy_page(page_addr, page_addr+1, &ecc_fatal);
-        if (ret_code) {
-            printf("Error, nand_copy_page returned %lu \n", ret_code);
-        }
-        if (ecc_fatal) {
-            printf("Got fatal ECC error");
-        }
-
-        // Read back from page+1 to check copy_page worked
-        ret_code = nand_read_page(page_addr+1, 0, read_page, PAGE_SIZE, &ecc_err);
-        if (ret_code) {
-            printf("Failed! Prog page returned %lu",ret_code);
-        }
-
-        // Check read correctly
-        if(0 != memcmp(read_page, write_page, PAGE_SIZE)) {
-            printf("Failed! Read vs Written does not match.");
-        }
-        
-
-
-    }
-    printf("Success! \n");
-    #endif
-
     while(1) {
-        retcode = nand_test();
+        retcode = nand_test(TEST_BLOCK, TEST_PROGRAM);
         if (retcode == AM_HAL_STATUS_SUCCESS) {
             printf("FLASH TEST PASS \n\n");
             am_hal_gpio_output_set(AM_BSP_GPIO_LED0);

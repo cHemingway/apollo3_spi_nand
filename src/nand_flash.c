@@ -1100,7 +1100,7 @@ uint32_t nand_print_bad_blocks(void) {
 }
 
 
-uint32_t nand_test(void) {
+uint32_t nand_test(bool block_test, bool program_test) {
     bool writable = false, busy = false, is_bad = false;
     uint8_t params_page[PARAMETER_PAGE_SIZE];
     uint8_t quad_params_page[PARAMETER_PAGE_SIZE];
@@ -1191,6 +1191,93 @@ uint32_t nand_test(void) {
     if (!is_free) {
         am_util_stdio_printf("FLASH TEST: Page 0 does not read as free! \n");
     }
+
+    // ****************
+    // Additional tests, require writing to flash so not used by default
+    // ****************
+    if (block_test) {
+        bool is_bad;
+        const int marked_block = 5; // Mark block 5
+        
+        // Erase block before marking
+        RET_CHECK(nand_erase_block(marked_block));
+
+        am_util_stdio_printf("Running extra block marking tests \n");
+        RET_CHECK(nand_check_bad_block(marked_block, &is_bad));
+        if (is_bad) {
+            am_util_stdio_printf(" check_bad_block failed, Block Already Marked! ");
+        }
+        // Mark the block and check it is marked correctly
+        RET_CHECK(nand_mark_bad_block(marked_block));
+        RET_CHECK(nand_check_bad_block(marked_block, &is_bad));
+        if (is_bad) {
+            am_util_stdio_printf(" Success marked as bad \n");
+        } else {
+            am_util_stdio_printf(" Failed! Block not marked as bad, or read incorrectly! \n");
+        }
+        for (int i=0; i<8; i++) {
+            RET_CHECK(nand_check_bad_block(i, &is_bad));
+            if (is_bad && (i!=marked_block)) {
+                am_util_stdio_printf(" Failed! Extra block %d marked as bad! \n", i);
+            }
+        }
+    }
+
+    if (program_test) {
+        const uint32_t block_addr = 4;   // Block 4 is in gauranteed non-bad section
+        const uint32_t page_addr = block_addr*PAGES_PER_BLOCK;
+        bool ecc_err;
+
+        // Test buffer to store pages in
+        uint8_t write_page[PAGE_SIZE];
+        uint8_t read_page[PAGE_SIZE];
+
+        am_util_stdio_printf("Running extra erase and program tests \n");
+
+        // Generate Data
+        for (int i=0; i<PAGE_SIZE; i++) {
+            write_page[i] = ((i&0xf) << 4) | (i&0xf); // generate 00, 11, 22, 33 etc
+        }
+
+        // Erase page and write value
+        RET_CHECK(nand_erase_block(block_addr));
+        RET_CHECK(nand_prog_page(page_addr, write_page));
+
+        // Read page 0 in between to clear cache
+        RET_CHECK(nand_read_page(0, 0, read_page, PAGE_SIZE, &ecc_err));
+
+        // Read back
+        RET_CHECK(nand_read_page(page_addr, 0, read_page, PAGE_SIZE, &ecc_err));
+
+        // Check read correctly
+        if(0 != memcmp(read_page, write_page, PAGE_SIZE)) {
+            am_util_stdio_printf("Failed! Read vs Written does not match.");
+        }
+
+        // Check is not marked as free now it has been erased
+        bool is_free;
+        RET_CHECK(nand_is_free(page_addr, &is_free));
+        if (is_free) {
+            am_util_stdio_printf("Error, is_free shows programmed page as free! \n");
+        }
+
+        // Copy to next page, since its erased
+        bool ecc_fatal;
+        RET_CHECK(nand_copy_page(page_addr, page_addr+1, &ecc_fatal));
+        if (ecc_fatal) {
+            am_util_stdio_printf("Error, copy_page got fatal ECC error");
+        }
+
+        // Read back from page+1 to check copy_page worked
+        RET_CHECK(nand_read_page(page_addr+1, 0, read_page, PAGE_SIZE, &ecc_err));
+
+        // Check read correctly
+        if(0 != memcmp(read_page, write_page, PAGE_SIZE)) {
+            am_util_stdio_printf("Failed! Read vs Written does not match.");
+        }
+    }
+
+
 
     #undef RET_CHECK
     #undef TOSTRING

@@ -54,7 +54,7 @@ uint32_t nand_copy_page(uint32_t src_page_addr, uint32_t dest_page_addr,
                         bool *ecc_fatal);
 
 /* After init, run this to test all features */
-uint32_t nand_test(void);
+uint32_t nand_test(bool block_test, bool program_test);
 
 /* Print all bad blocks, for debug */
 uint32_t nand_print_bad_blocks(void);
