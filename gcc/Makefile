@@ -199,6 +199,7 @@ SRC=
 SRC+= main.c
 SRC+= nand_flash.c
 SRC+= onfi_print.c
+SRC+= dhara_adaptor.c
 SRC+= startup_apollo3.s
 SRC+= am_util_delay.c
 SRC+= am_util_faultisr.c

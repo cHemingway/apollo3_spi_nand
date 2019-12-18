@@ -14,6 +14,9 @@
 
 #include "nand_flash.h"
 
+#include "dhara/map.h"
+#include "dhara/error.h"
+#include "dhara_adaptor.h"
 
 #ifndef TEST_BLOCK
 #define TEST_BLOCK      true
@@ -22,6 +25,8 @@
 #ifndef TEST_PROGRAM
 #define TEST_PROGRAM    true
 #endif
+
+uint8_t page_buf[PAGE_SIZE];
 
 // Override am_print_string so hard_fault_handler outputs over RTT
 void am_print_string(char *pcStr) {
@@ -91,6 +96,34 @@ int main(void)
         am_hal_gpio_pinconfig(AM_BSP_GPIO_MSPI_D1, GPIO_MSPI_D1);
         am_hal_gpio_pinconfig(AM_BSP_GPIO_MSPI_CE0, GPIO_MSPI_CE0);
     }
+
+    // DHARA FS Map Tests
+    // From dhara/tests/journal.c
+    {
+        printf("Running dhara tests.. \n");
+        struct dhara_map map;
+        dhara_error_t dhara_err;
+        printf("Map init\n");
+        dhara_map_init(&map, &dhara_adaptor_nand, page_buf, GC_RATIO);
+        dhara_map_resume(&map, NULL);
+        printf("  capacity: %d\n", dhara_map_capacity(&map));
+        printf("\n");
+
+        printf("Sync...\n");
+        retcode = dhara_map_sync(&map, &dhara_err);
+        if (retcode) {
+            printf("dhara_map_sync error %s \n",dhara_strerror(dhara_err));
+        }
+        printf("Resume...\n");
+        dhara_map_init(&map, &dhara_adaptor_nand, page_buf, GC_RATIO);
+        retcode = dhara_map_resume(&map, &dhara_err);
+        if (retcode) {
+            printf("dhara_map_resume error %s \n",dhara_strerror(dhara_err));
+        }
+
+        while(1);
+    }
+    
 
     while(1) {
         retcode = nand_test(TEST_BLOCK, TEST_PROGRAM);

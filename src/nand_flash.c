@@ -836,7 +836,7 @@ uint32_t nand_erase_block(uint16_t block_addr) {
  * Function to program a page. Takes data[] of PAGE_SIZE and programs the lot
  * Caution: Does not check if block is bad or not!
  */
-uint32_t nand_prog_page(uint32_t page_addr, uint8_t data[]) {
+uint32_t nand_prog_page(uint32_t page_addr, const uint8_t data[]) {
     bool program_fail, erase_fail;
     uint32_t ui32Status;
 

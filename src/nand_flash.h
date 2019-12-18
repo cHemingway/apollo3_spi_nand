@@ -17,10 +17,12 @@ typedef enum
 } am_devices_mspi_flash_status_t;
 
 #define PAGE_SIZE       (2*1024)  
+#define LOG2_PAGE_SIZE  11
 #define PAGES_PER_BLOCK 64
 #define LOG2_PPB        6
 #define NUM_BLOCKS      2048
 
+// TODO: Compile time check 2^log2_page_size == page_size
 
 uint32_t nand_init(void **pHandle);
 
@@ -42,7 +44,7 @@ uint32_t nand_mark_bad_block(uint32_t block_addr);
 
 uint32_t nand_erase_block(uint16_t block_addr);
 
-uint32_t nand_prog_page(uint32_t page_addr, uint8_t data[]);
+uint32_t nand_prog_page(uint32_t page_addr, const uint8_t data[]);
 
 uint32_t nand_is_free(uint32_t page_addr, bool *is_free);
 
