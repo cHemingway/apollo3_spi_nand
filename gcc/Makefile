@@ -70,6 +70,10 @@
 #******************************************************************************
 
 
+# Preamble
+MAKEFLAGS += --warn-undefined-variables
+MAKEFLAGS += --no-builtin-rules
+
 #******************************************************************************
 #
 # User Options
@@ -91,6 +95,9 @@ SDKPATH						?= # Set as the path to the SDK root if not located at ../../../../
 COMMONPATH					?= # Set as the path to the BSP if not located at ../../../../common
 BOARDPATH					?= # Set as the path to the board if not located at ../../..
 PROJECTPATH					?= # Set as the path to the project if not located at ../..
+
+# Path to Dhara FTL
+DHARAPATH					?= $(PROJECTPATH)/dhara
 
 ### Project Settings
 TARGET := executable
@@ -185,7 +192,7 @@ INCLUDES+= -I$(SDKPATH)/devices
 INCLUDES+= -I$(SDKPATH)/mcu/apollo3
 INCLUDES+= -I$(SDKPATH)/CMSIS/AmbiqMicro/Include
 INCLUDES+= -I$(SDKPATH)/CMSIS/ARM/Include
-INCLUDES+=
+INCLUDES+= -I$(DHARAPATH)
 
 # Compilation Units (Add all the .c files you need to compile)
 SRC=
@@ -203,6 +210,7 @@ SRC+= system_apollo3.c
 SRC+= SEGGER_RTT.c
 SRC+= SEGGER_RTT_ASM_ARMv7M.S
 SRC+= SEGGER_RTT_Syscalls_GCC.c
+SRC+= $(notdir $(wildcard $(DHARAPATH)/dhara/*.c))
 SRC+=
 
 # VPATH (Add paths to where your source files are located)
@@ -212,6 +220,7 @@ VPATH+= $(PROJECTPATH)/rtt
 VPATH+= $(SDKPATH)/utils
 VPATH+= $(SDKPATH)/CMSIS/AmbiqMicro/Source
 VPATH+= $(BOARDPATH)/bsp
+VPATH+= $(DHARAPATH)/dhara
 VPATH+=
 
 # LIBS (Precompiled libraries to include in the linker step)
