@@ -1234,14 +1234,24 @@ uint32_t nand_test(bool block_test, bool program_test) {
 
         am_util_stdio_printf("Running extra erase and program tests \n");
 
-        // Generate Data
-        for (int i=0; i<PAGE_SIZE; i++) {
-            write_page[i] = ((i&0xf) << 4) | (i&0xf); // generate 00, 11, 22, 33 etc
-        }
+
 
         // Erase page and write value
         RET_CHECK(nand_erase_block(block_addr));
+
+        // Check is marked as free now it has been erased
+        bool is_free;
+        RET_CHECK(nand_is_free(page_addr, &is_free));
+        if (!is_free) {
+            am_util_stdio_printf("Error, is_free shows free page as busy! \n");
+        }
+
+        // Generate Data and write to page
+        for (int i=0; i<PAGE_SIZE; i++) {
+            write_page[i] = ((i&0xf) << 4) | (i&0xf); // generate 00, 11, 22, 33 etc
+        }
         RET_CHECK(nand_prog_page(page_addr, write_page));
+
 
         // Read page 0 in between to clear cache
         RET_CHECK(nand_read_page(0, 0, read_page, PAGE_SIZE, &ecc_err));
