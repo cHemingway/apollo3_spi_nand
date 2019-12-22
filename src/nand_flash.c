@@ -1264,14 +1264,29 @@ uint32_t nand_test(bool block_test, bool program_test) {
             am_util_stdio_printf("Failed! Read vs Written does not match.");
         }
 
-        // Check is not marked as free now it has been erased
-        bool is_free;
+        // Check different offsets read 32 bytes correctly
+        for (int offset=1; offset< (2048 - 32); offset*=2) {
+            RET_CHECK(nand_read_page(page_addr, offset, read_page, 32, &ecc_err));
+            for (int j=0; j<32; j++) {
+                uint32_t i = offset + j;    // Calculate value
+                uint8_t expected = ((i&0xf) << 4) | (i&0xf);
+                // Compare against expected. We use j as this is without read offset
+                if (expected != read_page[j] ) { 
+                    am_util_stdio_printf("Error, read does not match written at offset %lu \n", offset);
+                    offset = 10000; // Break out of outer loop
+                    break;
+                }
+            }
+        }
+        
+
+        // Check is not marked as free now it has been written to
         RET_CHECK(nand_is_free(page_addr, &is_free));
         if (is_free) {
             am_util_stdio_printf("Error, is_free shows programmed page as free! \n");
         }
 
-        // Copy to next page, since its erased
+        // Copy to next page, since the block has been erased
         bool ecc_fatal;
         RET_CHECK(nand_copy_page(page_addr, page_addr+1, &ecc_fatal));
         if (ecc_fatal) {
