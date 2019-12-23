@@ -214,9 +214,13 @@ SRC+= SEGGER_RTT_Syscalls_GCC.c
 SRC+= $(notdir $(wildcard $(DHARAPATH)/dhara/*.c))
 SRC+=
 
+# Main for unit tests instead, will replace main.c (hardcoded)
+TEST_MAIN = test_nand_flash.c
+
 # VPATH (Add paths to where your source files are located)
 VPATH=
 VPATH+= $(PROJECTPATH)/src
+VPATH+= $(PROJECTPATH)/test
 VPATH+= $(PROJECTPATH)/rtt
 VPATH+= $(SDKPATH)/utils
 VPATH+= $(SDKPATH)/CMSIS/AmbiqMicro/Source
@@ -325,7 +329,7 @@ ODFLAGS = -S
 # Targets / Rules
 #
 #******************************************************************************
-all: directories $(CONFIG)/$(TARGET)_asb.bin print_size
+all: directories $(CONFIG)/$(TARGET)_asb.bin $(CONFIG)/$(TARGET)_unittest.elf print_size
 
 directories: $(CONFIG)
 
@@ -368,6 +372,17 @@ clean:
 	$(RM) -f $(OBJS) $(DEPS) \
 	    $(CONFIG)/$(TARGET).bin $(CONFIG)/$(TARGET).axf \
 	    $(CONFIG)/$(TARGET).lst $(CONFIG)/$(TARGET).map
+
+
+# Generate source for unit tests by removing main.o and adding $test_main
+TEST_OBJS = $(filter-out $(CONFIG)/main.o, $(OBJS))
+TEST_OBJS += $(TEST_MAIN:%.c=$(CONFIG)/%.o)
+
+# Unit test executable
+$(CONFIG)/$(TARGET)_unittest.elf: LINKER_FILE = $(PROJECTPATH)/gcc/ama3b1kk-kbr_rom.ld
+$(CONFIG)/$(TARGET)_unittest.elf: $(TEST_OBJS) $(LIBS)
+	@echo " Linking $(COMPILERNAME) $@ with script $(LINKER_FILE)";\
+	$(CC) -Wl,-T,$(LINKER_FILE) -o $@ $(TEST_OBJS) $(LFLAGS)
 
 $(CONFIG)/%.d: ;
 

@@ -19,7 +19,7 @@
 #include "dhara_adaptor.h"
 
 #ifndef TEST_BLOCK
-#define TEST_BLOCK      true
+#define TEST_BLOCK      false
 #endif
 
 #ifndef TEST_PROGRAM
@@ -167,7 +167,7 @@ int main(void)
 
         printf("Read back...\n");
 	    for (int i = 0; i < test_sectors; i++) {
-
+		    
             if(dhara_map_read(&map, i, dhara_test_buf, &dhara_err)) {
                 printf("map_read error: %s \n", dhara_strerror(dhara_err));
                 return; // TODO exit()
@@ -176,7 +176,7 @@ int main(void)
         }
         printf("Success! /n");
         while(1);
-    }
+	}
     #endif
 
     
