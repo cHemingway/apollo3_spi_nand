@@ -197,6 +197,7 @@ INCLUDES+= -I$(DHARAPATH)
 # Compilation Units (Add all the .c files you need to compile)
 SRC=
 SRC+= main.c
+SRC+= system.c
 SRC+= nand_flash.c
 SRC+= onfi_print.c
 SRC+= dhara_adaptor.c

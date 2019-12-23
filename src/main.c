@@ -10,8 +10,7 @@
 #include "am_util.h"
 #include "system_apollo3.h"
 
-#include "SEGGER_RTT.h"
-
+#include "system.h"
 #include "nand_flash.h"
 
 #include "dhara/map.h"
@@ -29,18 +28,7 @@
 uint8_t dhara_page_buf[PAGE_SIZE];
 uint8_t dhara_test_buf[PAGE_SIZE];
 
-// Override am_print_string so hard_fault_handler outputs over RTT
-void am_print_string(char *pcStr) {
-    SEGGER_RTT_WriteString(0, pcStr);
-}
 
-
-// Increment g_tick_ms every systick
-static volatile uint32_t g_tick_ms;  // Systick counter
-void SysTick_Handler(void)
-{
-    g_tick_ms++;
-}
 
 
 // Forked versions of dhara/tests/util.c to not use abort()
@@ -79,27 +67,7 @@ int main(void)
     uint32_t      retcode;
     void          *pHandle = NULL;
 
-    // Set the clock frequency, 48MHz, no turbo
-    am_hal_clkgen_control(AM_HAL_CLKGEN_CONTROL_SYSCLK_MAX, 0);
-
-    // Set the default cache configuration
-    am_hal_cachectrl_config(&am_hal_cachectrl_defaults);
-    am_hal_cachectrl_enable();
-
-    // Configure the board for low power operation.
-    am_bsp_low_power_init();
-
-    // Init RTT, printf() will be redirected to this
-    SEGGER_RTT_Init(); 
-
-    // Redirect AMBIQ Printf to RTT
-    am_util_stdio_printf_init(am_print_string);
-
-    // Enable interrupts.
-    am_hal_interrupt_master_enable();
-
-    SystemCoreClockUpdate();                //update clock variable SystemCoreClock (defined by CMSIS)
-    SysTick_Config(SystemCoreClock / 1000); //setup 1ms SysTick (defined by CMSIS)
+    system_init();
 
     printf("Starting Flash Tests \n");                  // Outputs over Segger RTT
 
