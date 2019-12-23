@@ -334,6 +334,22 @@ uint32_t nand_init(void **pHandle)
     pins_device_config = AM_HAL_MSPI_FLASH_QUAD_CE0; //TODO: Make chip select configurable
     am_bsp_mspi_pins_enable(ui32Module, pins_device_config);
 
+    // HACK: Set lower drive strength for clock to avoid ringing
+    // Ideally this should be within BSP
+    // Copy of g_AM_BSP_GPIO_MSPI_SCK with lower drive strength
+    {
+        am_hal_gpio_pincfg_t GPIO_MSPI_SCK = g_AM_BSP_GPIO_MSPI_SCK;
+        am_hal_gpio_pincfg_t GPIO_MSPI_D1 = g_AM_BSP_GPIO_MSPI_D1;
+        am_hal_gpio_pincfg_t GPIO_MSPI_CE0 = g_AM_BSP_GPIO_MSPI_CE0;
+        GPIO_MSPI_SCK.eDriveStrength = AM_HAL_GPIO_PIN_DRIVESTRENGTH_4MA; // Reduce 12 to 4
+        GPIO_MSPI_D1.eDriveStrength = AM_HAL_GPIO_PIN_DRIVESTRENGTH_4MA; // Reduce 8 to 4
+        GPIO_MSPI_CE0.eDriveStrength = AM_HAL_GPIO_PIN_DRIVESTRENGTH_4MA; // Reduce 12 to 4
+        am_hal_gpio_pinconfig(AM_BSP_GPIO_MSPI_SCK, GPIO_MSPI_SCK);
+        am_hal_gpio_pinconfig(AM_BSP_GPIO_MSPI_D1, GPIO_MSPI_D1);
+        am_hal_gpio_pinconfig(AM_BSP_GPIO_MSPI_CE0, GPIO_MSPI_CE0);
+    }
+
+
     //
     // Enable MSPI interrupts.
     //
