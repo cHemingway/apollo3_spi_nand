@@ -5,6 +5,30 @@
 		}
 	],
 	"settings": {
-		"cortex-debug.JLinkGDBServerPath": "/mnt/c/Program Files (x86)/SEGGER/Jlink/JLinkGDBServerCL.exe"
+		"cortex-debug.JLinkGDBServerPath": "/mnt/c/Program Files (x86)/SEGGER/Jlink/JLinkGDBServerCL.exe",
+		"files.exclude": {
+			"${workspaceRoot}/../AmbiqSuite-Rel2.2.0/mcu/apollo1/**": true,
+			"${workspaceRoot}/../AmbiqSuite-Rel2.2.0/mcu/apollo2/**": true,
+			"${workspaceRoot}/../AmbiqSuite-Rel2.2.0/boards/apollo1_evb/**": true,
+			"${workspaceRoot}/../AmbiqSuite-Rel2.2.0/boards/apollo2_blue_evb/**": true,
+			"${workspaceRoot}/../AmbiqSuite-Rel2.2.0/boards/apollo2_evb/**": true,
+		},
+		"search.exclude": {
+			"${workspaceRoot}/../AmbiqSuite-Rel2.2.0/mcu/apollo1/*": true,
+			"${workspaceRoot}/../AmbiqSuite-Rel2.2.0/mcu/apollo2/*": true,
+			"${workspaceRoot}/../AmbiqSuite-Rel2.2.0/boards/apollo1_evb/*": true,
+			"${workspaceRoot}/../AmbiqSuite-Rel2.2.0/boards/apollo2_blue_evb/*": true,
+			"${workspaceRoot}/../AmbiqSuite-Rel2.2.0/boards/apollo2_evb/*": true,
+		},
+		"files.associations": {
+			"mt79f_cmd_regs.h": "c",
+			"nand_flash.h": "c",
+			"nand.h": "c",
+			"error.h": "c",
+			"journal.h": "c",
+			"dhara_adaptor.h": "c",
+			"map.h": "c",
+			"util.h": "c"
+		},
 	}
 }
