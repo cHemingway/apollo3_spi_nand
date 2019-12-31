@@ -15,6 +15,8 @@
 
 #include "nand_flash.h"
 
+#include "metal/unit.h"
+
 //*****************************************************************************
 // Main
 //*****************************************************************************
@@ -24,4 +26,14 @@ int main(void)
 
 
     printf("Hello World \n!");
+
+    METAL_ASSERT(1);
+
+
+    return METAL_REPORT();
+}
+
+
+void _exit(int code) {
+    while(1);
 }

@@ -21,3 +21,6 @@ __pycache__
 
 # Cortex-Debug
 .vscode/.cortex-debug.*.state.json
+
+# Metal.runner logs
+gcc/*.log*

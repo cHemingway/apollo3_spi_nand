@@ -1,0 +1,7 @@
+monitor reset
+monitor halt
+load
+monitor reset
+monitor halt
+monitor halt
+continue

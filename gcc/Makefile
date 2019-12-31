@@ -185,6 +185,7 @@ DEFINES+=
 INCLUDES=
 INCLUDES+= -I$(PROJECTPATH)/src
 INCLUDES+= -I$(PROJECTPATH)/rtt
+INCLUDES+= -I$(PROJECTPATH)/test
 INCLUDES+= -I$(BOARDPATH)/bsp
 INCLUDES+= -I$(SDKPATH)
 INCLUDES+= -I$(SDKPATH)/utils
@@ -215,8 +216,12 @@ SRC+= SEGGER_RTT_Syscalls_GCC.c
 SRC+= $(notdir $(wildcard $(DHARAPATH)/dhara/*.c))
 SRC+=
 
-# Main for unit tests instead, will replace main.c (hardcoded)
+# Main for unit tests instead, will replace main.c 
+# We swap out the syscalls implementation as well
 TEST_MAIN = test_nand_flash.c
+TEST_MAIN+= metal_newlib_syscalls.c
+TEST_EXCLUDE = 	main.c
+TEST_EXCLUDE += SEGGER_RTT_Syscalls_GCC.c
 
 # VPATH (Add paths to where your source files are located)
 VPATH=
@@ -376,7 +381,8 @@ clean:
 
 
 # Generate source for unit tests by removing main.o and adding $test_main
-TEST_OBJS = $(filter-out $(CONFIG)/main.o, $(OBJS))
+TEST_EXCLUDE_OBJS = $(TEST_EXCLUDE:%.c=$(CONFIG)/%.o)
+TEST_OBJS = $(filter-out $(TEST_EXCLUDE_OBJS), $(OBJS))
 TEST_OBJS += $(TEST_MAIN:%.c=$(CONFIG)/%.o)
 
 # Unit test executable
@@ -384,6 +390,11 @@ $(CONFIG)/$(TARGET)_unittest.elf: LINKER_FILE = $(PROJECTPATH)/gcc/ama3b1kk-kbr_
 $(CONFIG)/$(TARGET)_unittest.elf: $(TEST_OBJS) $(LIBS)
 	@echo " Linking $(COMPILERNAME) $@ with script $(LINKER_FILE)";\
 	$(CC) -Wl,-T,$(LINKER_FILE) -o $@ $(TEST_OBJS) $(LFLAGS)
+
+
+# Run unit tests using metal.runner
+run_unit_tests: $(CONFIG)/$(TARGET)_unittest.elf
+	metal.runner --config-file="$(PROJECTPATH)/test/metal_runner.cfg" --init-script="$(PROJECTPATH)/test/test_script_gdb" --exe=$(CONFIG)/$(TARGET)_unittest.elf 
 
 $(CONFIG)/%.d: ;
 
@@ -402,5 +413,5 @@ print_size:
 # Automatically include any generated dependencies
 -include $(DEPS)
 endif
-.PHONY: all clean directories bootload bootload_asb bootload_svl print_size
+.PHONY: all clean directories bootload bootload_asb bootload_svl print_size run_unit_tests
 
