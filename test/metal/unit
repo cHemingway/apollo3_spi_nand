@@ -1,5 +1,0 @@
-#if defined(__cplusplus)
-#include <metal/unit.hpp>
-#else
-#include <metal/unit.h>
-#endif

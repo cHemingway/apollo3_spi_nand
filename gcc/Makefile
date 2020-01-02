@@ -99,6 +99,9 @@ PROJECTPATH					?= # Set as the path to the project if not located at ../..
 # Path to Dhara FTL
 DHARAPATH					?= $(PROJECTPATH)/dhara
 
+# Path to Metal submodule
+METALPATH					?= $(PROJECTPATH)/metal.test
+
 ### Project Settings
 TARGET := executable
 COMPILERNAME := gcc
@@ -194,6 +197,7 @@ INCLUDES+= -I$(SDKPATH)/mcu/apollo3
 INCLUDES+= -I$(SDKPATH)/CMSIS/AmbiqMicro/Include
 INCLUDES+= -I$(SDKPATH)/CMSIS/ARM/Include
 INCLUDES+= -I$(DHARAPATH)
+INCLUDES+= -I$(METALPATH)
 
 # Compilation Units (Add all the .c files you need to compile)
 SRC=
@@ -232,6 +236,7 @@ VPATH+= $(SDKPATH)/utils
 VPATH+= $(SDKPATH)/CMSIS/AmbiqMicro/Source
 VPATH+= $(BOARDPATH)/bsp
 VPATH+= $(DHARAPATH)/dhara
+VPATH+= $(METALPATH)/target
 VPATH+=
 
 # LIBS (Precompiled libraries to include in the linker step)
@@ -393,7 +398,7 @@ $(CONFIG)/$(TARGET)_unittest.elf: $(TEST_OBJS) $(LIBS)
 
 
 # Run unit tests using metal.runner python version (experimental)
-run_unit_tests: $(CONFIG)/$(TARGET)_unittest.elf
+run_unit_tests: $(CONFIG)/$(TARGET)_unittest.elf ../test/metal_runner_gdb_py
 # Run JLink GDB server in single mode in background. Will terminate when GDB disconnects
 	"/mnt/c/Program Files (x86)/SEGGER/Jlink/JLinkGDBServerCL.exe" -If SWD -Speed 4000 -Device AMA3B1KK-KBR -vd -singlerun -silent &
 # Pause for JLink to wake up, so don't swamp arm output
