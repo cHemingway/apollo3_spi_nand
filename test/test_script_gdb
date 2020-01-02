@@ -1,7 +1,9 @@
+monitor flash breakpoints = 0
 monitor reset
-monitor halt
 load
 monitor reset
 monitor halt
-monitor halt
+continue
+delete
+monitor clrbp
 continue
