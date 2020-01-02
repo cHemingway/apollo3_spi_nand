@@ -392,9 +392,15 @@ $(CONFIG)/$(TARGET)_unittest.elf: $(TEST_OBJS) $(LIBS)
 	$(CC) -Wl,-T,$(LINKER_FILE) -o $@ $(TEST_OBJS) $(LFLAGS)
 
 
-# Run unit tests using metal.runner
+# Run unit tests using metal.runner python version (experimental)
 run_unit_tests: $(CONFIG)/$(TARGET)_unittest.elf
-	metal.runner --config-file="$(PROJECTPATH)/test/metal_runner.cfg" --init-script="$(PROJECTPATH)/test/test_script_gdb" --exe=$(CONFIG)/$(TARGET)_unittest.elf 
+# Run JLink GDB server in single mode in background. Will terminate when GDB disconnects
+	"/mnt/c/Program Files (x86)/SEGGER/Jlink/JLinkGDBServerCL.exe" -If SWD -Speed 4000 -Device AMA3B1KK-KBR -vd -singlerun -silent &
+# Pause for JLink to wake up, so don't swamp arm output
+	sleep 1
+# Run test runner script under GDB, use batch mode for auto confirm
+	arm-none-eabi-gdb-py --batch -x ../test/metal_runner_gdb_py $(CONFIG)/$(TARGET)_unittest.elf
+	
 
 $(CONFIG)/%.d: ;
 
