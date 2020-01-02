@@ -23,17 +23,19 @@
 int main(void)
 {
     system_init();
+    am_hal_gpio_output_set(AM_BSP_GPIO_LED0);
 
 
     printf("Hello World \n!");
 
     METAL_ASSERT(1);
 
-
+    am_hal_gpio_output_clear(AM_BSP_GPIO_LED0);
     return METAL_REPORT();
 }
 
 
 void _exit(int code) {
+    am_hal_gpio_output_set(AM_BSP_GPIO_LED1);
     while(1);
 }
