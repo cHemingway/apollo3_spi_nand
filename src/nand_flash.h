@@ -30,12 +30,6 @@ uint32_t nand_id(void);
 
 uint32_t nand_reset(void);
 
-uint32_t nand_write_enable(void);
-
-uint32_t nand_write_disable(void);
-
-uint32_t nand_get_writable(bool *writable);
-
 uint32_t nand_read_params_page(uint8_t *params_page, uint32_t len, bool use_quad);
 
 uint32_t nand_check_bad_block(uint32_t block_addr, bool *is_bad);
