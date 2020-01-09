@@ -14,9 +14,13 @@ __pycache__
 *.map
 *.lst
 *.axf
+*.elf
 
 # MacOSX
 *.DS_Store
 
 # Cortex-Debug
 .vscode/.cortex-debug.*.state.json
+
+# Metal.runner logs
+gcc/*.log*

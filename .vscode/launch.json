@@ -16,6 +16,19 @@
             "interface": "swd",         
             "preLaunchTask": "make",    // In tasks.json
             "runToMain": true // Needed to stop at main at beginning, or else very confusing
+        }, 
+        {
+            "name": "Unit Test Debug",
+            "cwd": "${workspaceRoot}/",
+            "executable": "./gcc/bin/executable_unittest.elf",
+            "request": "launch",
+            "type": "cortex-debug",
+            "svdFile": "${workspaceRoot}/../AmbiqSuite-Rel2.2.0/pack/SVD/apollo3.svd",
+            "servertype": "jlink",
+            "device": "AMA3B1KK-KBR",
+            "interface": "swd",         
+            "preLaunchTask": "make",    // In tasks.json
+            "runToMain": true // Needed to stop at main at beginning, or else very confusing
         }
     ]
 }

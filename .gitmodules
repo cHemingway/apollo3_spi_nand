@@ -1,3 +1,6 @@
 [submodule "dhara"]
 	path = dhara
 	url = https://github.com/dlbeer/dhara.git
+[submodule "metal.test"]
+	path = metal.test
+	url = https://github.com/klemens-morgenstern/metal.test.git

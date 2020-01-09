@@ -1,0 +1,14 @@
+# TODO: Get metal.test dir from Makefile, rather than hardcode
+source ../metal.test/gdb-plugins/metal-exitcode.py
+source ../metal.test/gdb-plugins/metal-newlib.py
+source ../metal.test/gdb-plugins/metal-unit.py
+set print elements 0
+set print repeats 0
+set metal-test-json-file test_report.json
+target remote localhost:2331
+monitor reset
+load
+monitor reset
+continue
+set confirm off
+quit

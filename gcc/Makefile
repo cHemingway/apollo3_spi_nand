@@ -99,6 +99,9 @@ PROJECTPATH					?= # Set as the path to the project if not located at ../..
 # Path to Dhara FTL
 DHARAPATH					?= $(PROJECTPATH)/dhara
 
+# Path to Metal submodule
+METALPATH					?= $(PROJECTPATH)/metal.test
+
 ### Project Settings
 TARGET := executable
 COMPILERNAME := gcc
@@ -185,6 +188,7 @@ DEFINES+=
 INCLUDES=
 INCLUDES+= -I$(PROJECTPATH)/src
 INCLUDES+= -I$(PROJECTPATH)/rtt
+INCLUDES+= -I$(PROJECTPATH)/test
 INCLUDES+= -I$(BOARDPATH)/bsp
 INCLUDES+= -I$(SDKPATH)
 INCLUDES+= -I$(SDKPATH)/utils
@@ -193,10 +197,12 @@ INCLUDES+= -I$(SDKPATH)/mcu/apollo3
 INCLUDES+= -I$(SDKPATH)/CMSIS/AmbiqMicro/Include
 INCLUDES+= -I$(SDKPATH)/CMSIS/ARM/Include
 INCLUDES+= -I$(DHARAPATH)
+INCLUDES+= -I$(METALPATH)/include
 
 # Compilation Units (Add all the .c files you need to compile)
 SRC=
 SRC+= main.c
+SRC+= system.c
 SRC+= nand_flash.c
 SRC+= onfi_print.c
 SRC+= dhara_adaptor.c
@@ -214,14 +220,23 @@ SRC+= SEGGER_RTT_Syscalls_GCC.c
 SRC+= $(notdir $(wildcard $(DHARAPATH)/dhara/*.c))
 SRC+=
 
+# Main for unit tests instead, will replace main.c 
+# We swap out the syscalls implementation as well
+TEST_MAIN = test_nand_flash.c
+TEST_MAIN+= metal_newlib_syscalls.c
+TEST_EXCLUDE = 	main.c
+TEST_EXCLUDE += SEGGER_RTT_Syscalls_GCC.c
+
 # VPATH (Add paths to where your source files are located)
 VPATH=
 VPATH+= $(PROJECTPATH)/src
+VPATH+= $(PROJECTPATH)/test
 VPATH+= $(PROJECTPATH)/rtt
 VPATH+= $(SDKPATH)/utils
 VPATH+= $(SDKPATH)/CMSIS/AmbiqMicro/Source
 VPATH+= $(BOARDPATH)/bsp
 VPATH+= $(DHARAPATH)/dhara
+VPATH+= $(METALPATH)/target
 VPATH+=
 
 # LIBS (Precompiled libraries to include in the linker step)
@@ -325,7 +340,7 @@ ODFLAGS = -S
 # Targets / Rules
 #
 #******************************************************************************
-all: directories $(CONFIG)/$(TARGET)_asb.bin print_size
+all: directories $(CONFIG)/$(TARGET)_asb.bin $(CONFIG)/$(TARGET)_unittest.elf print_size
 
 directories: $(CONFIG)
 
@@ -369,6 +384,29 @@ clean:
 	    $(CONFIG)/$(TARGET).bin $(CONFIG)/$(TARGET).axf \
 	    $(CONFIG)/$(TARGET).lst $(CONFIG)/$(TARGET).map
 
+
+# Generate source for unit tests by removing main.o and adding $test_main
+TEST_EXCLUDE_OBJS = $(TEST_EXCLUDE:%.c=$(CONFIG)/%.o)
+TEST_OBJS = $(filter-out $(TEST_EXCLUDE_OBJS), $(OBJS))
+TEST_OBJS += $(TEST_MAIN:%.c=$(CONFIG)/%.o)
+
+# Unit test executable
+$(CONFIG)/$(TARGET)_unittest.elf: LINKER_FILE = $(PROJECTPATH)/gcc/ama3b1kk-kbr_rom.ld
+$(CONFIG)/$(TARGET)_unittest.elf: $(TEST_OBJS) $(LIBS)
+	@echo " Linking $(COMPILERNAME) $@ with script $(LINKER_FILE)";\
+	$(CC) -Wl,-T,$(LINKER_FILE) -o $@ $(TEST_OBJS) $(LFLAGS)
+
+
+# Run unit tests using metal.runner python version (experimental)
+run_unit_tests: $(CONFIG)/$(TARGET)_unittest.elf ../test/metal_runner_gdb_py
+# Run JLink GDB server in single mode in background. Will terminate when GDB disconnects
+	"/mnt/c/Program Files (x86)/SEGGER/Jlink/JLinkGDBServerCL.exe" -If SWD -Speed 4000 -Device AMA3B1KK-KBR -vd -singlerun -silent &
+# Pause for JLink to wake up, so don't swamp arm output
+	sleep 1
+# Run test runner script under GDB, use batch mode for auto confirm
+	arm-none-eabi-gdb-py --batch -x ../test/metal_runner_gdb_py $(CONFIG)/$(TARGET)_unittest.elf
+	
+
 $(CONFIG)/%.d: ;
 
 $(SDKPATH)/mcu/apollo3/hal/gcc/bin/libam_hal.a:
@@ -386,5 +424,5 @@ print_size:
 # Automatically include any generated dependencies
 -include $(DEPS)
 endif
-.PHONY: all clean directories bootload bootload_asb bootload_svl print_size
+.PHONY: all clean directories bootload bootload_asb bootload_svl print_size run_unit_tests
 
