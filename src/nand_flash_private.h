@@ -11,6 +11,7 @@ uint32_t _nand_cmd_write_disable(void);
 uint32_t _nand_get_writable(bool *writable);
 
 uint32_t _nand_cmd_page_read(uint32_t page_addr);
+uint32_t _nand_cmd_read_x1(uint16_t column_addr, uint32_t *data, uint32_t data_len);
 
 uint32_t _nand_get_busy(bool *busy);
 

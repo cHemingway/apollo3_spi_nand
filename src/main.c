@@ -81,7 +81,6 @@ int main(void)
 
     // DHARA FS Map Tests
     // From dhara/tests/journal.c
-    #if TEST_DHARA
     {
         printf("Running dhara tests.. \n");
         struct dhara_map map;
@@ -130,30 +129,7 @@ int main(void)
         printf("Success! /n");
         while(1);
 	}
-    #endif
 
-    
-
-    while (1) {
-        retcode = nand_test(TEST_BLOCK, TEST_PROGRAM);
-        if (retcode == AM_HAL_STATUS_SUCCESS) {
-            printf("FLASH TEST PASS \n\n");
-            am_hal_gpio_output_set(AM_BSP_GPIO_LED0);
-            am_hal_gpio_output_clear(AM_BSP_GPIO_LED3);
-        } else { // Error
-            printf("FLASH TEST FAIL \n\n");
-            am_hal_gpio_output_set(AM_BSP_GPIO_LED3);
-            am_hal_gpio_output_clear(AM_BSP_GPIO_LED0);
-        }
-
-        uint32_t duration, start_time = g_tick_ms;
-        nand_print_bad_blocks();
-        duration = g_tick_ms - start_time;
-        printf("Took %lu ms, %lu blocks/second \n",duration, 
-                        (uint32_t)(NUM_BLOCKS/((float)duration * 0.001f)));
-        
-        am_util_delay_ms(2000);
-    }
 
     // Go to Deep Sleep.
     am_hal_sysctrl_sleep(AM_HAL_SYSCTRL_SLEEP_DEEP);
