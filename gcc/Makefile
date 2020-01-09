@@ -197,7 +197,7 @@ INCLUDES+= -I$(SDKPATH)/mcu/apollo3
 INCLUDES+= -I$(SDKPATH)/CMSIS/AmbiqMicro/Include
 INCLUDES+= -I$(SDKPATH)/CMSIS/ARM/Include
 INCLUDES+= -I$(DHARAPATH)
-INCLUDES+= -I$(METALPATH)
+INCLUDES+= -I$(METALPATH)/include
 
 # Compilation Units (Add all the .c files you need to compile)
 SRC=
