@@ -55,6 +55,37 @@
                     "message": 5
                 }
             }
-        }
+        },
+        {
+            "label": "run_unit_tests",
+            "type": "shell",
+            "command": "make",
+            "args":[
+                "-j6",
+                "run_unit_tests"
+                ], 
+            // use options.cwd property if the Makefile is not in the project root ${workspaceRoot} dir
+            "options": {
+                "cwd": "${workspaceRoot}/gcc"
+            },
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            // Use the standard less compilation problem matcher.
+            "problemMatcher": {
+                "owner": "cpp",
+                // Set fileLocation to be relative to makefile location
+                "fileLocation": ["relative", "${workspaceRoot}/gcc"],
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            }
+        },
     ]
 }
