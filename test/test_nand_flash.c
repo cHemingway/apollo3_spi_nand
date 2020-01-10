@@ -17,6 +17,8 @@
 #include "nand_flash_private.h"
 #include "onfi_print.h"
 
+// Print only warnings, not every test
+#define METAL_UNIT_ONLY_WARNINGS
 #include "metal/unit.h"
 
 
