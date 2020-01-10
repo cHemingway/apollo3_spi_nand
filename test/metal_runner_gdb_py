@@ -5,6 +5,8 @@ source ../metal.test/gdb-plugins/metal-unit.py
 set print elements 0
 set print repeats 0
 set metal-test-json-file test_report.json
+# Show only warnings, not every test executed
+set metal-test-print-level warning
 target remote localhost:2331
 monitor reset
 load
