@@ -184,6 +184,9 @@ DEFINES+= -DAM_UTIL_FAULTISR_PRINT
 DEFINES+= -DMICRON_MT29F8G01AD
 DEFINES+=
 
+# Extra CFLAGS
+EXTRA_CFLAGS=
+
 # Includes (Add paths to where example header files are located)
 INCLUDES=
 INCLUDES+= -I$(PROJECTPATH)/src
@@ -378,11 +381,10 @@ bootload_svl: $(CONFIG)/$(TARGET)_svl.bin
 
 bootload: bootload_svl
 
+
 clean:
 	@echo "Cleaning..." ;\
-	$(RM) -f $(OBJS) $(DEPS) \
-	    $(CONFIG)/$(TARGET).bin $(CONFIG)/$(TARGET).axf \
-	    $(CONFIG)/$(TARGET).lst $(CONFIG)/$(TARGET).map
+	$(RM) -R -f $(CONFIG) ;
 
 
 # Generate source for unit tests by removing main.o and adding $test_main
