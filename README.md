@@ -34,7 +34,9 @@ Dhara file system does not have automated tests yet, see `src/main.c`
 
 **Ensure EVK I/O voltage is set correctly**
 
+
 |MCU Name|MCU Pin|Flash Name|Flash Pin|
+| --- | --- | -- | -- |
 |1.8V|||8|
 |GND|||4|
 |SCLK|24|SCLK|6|
@@ -43,6 +45,7 @@ Dhara file system does not have automated tests yet, see `src/main.c`
 |MSPI1/MISO|26|SO/IO1|2|
 |MSPI2|4|IO2|3|
 |MSPI3|23|IO3|7|
+
 
 #### Running tests
 * Makefile is under `gcc` folder, `cd` there to run commands
