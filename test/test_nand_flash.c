@@ -218,6 +218,33 @@ void test_program(void) {
         // TODO: Clean up by erasing blocks
 }
 
+// Test quad read returns same as individual read
+void test_quad_read_cache(void) {
+
+    // Generate ascending bytes
+    for (int i=0;i<PAGE_SIZE;i++) {page_buffer[i] =i&0xff;} // Ascending bytes
+    // Program and read back
+    ASSERT_SUCCESS(_nand_cmd_program_load_x1(0, (uint32_t *)page_buffer, PAGE_SIZE));
+    ASSERT_SUCCESS(_nand_cmd_read_quadio(0, (uint32_t *)page_buffer, PAGE_SIZE));
+    
+    // Wrap compare in critical, as we don't want to keep displaying wrong values
+    METAL_ENTER_CRITICAL();
+    // Compare using METAL_RANGED
+    // Removed! Takes too long as prints every value via GDB
+    //METAL_RANGED(__metal_level_assert, 
+    //            page_buffer, PAGE_SIZE, i, PAGE_SIZE, 
+    //            METAL_ASSERT_EQUAL(page_buffer[i], (i&0xff)));
+
+    METAL_LOG("Comparing read vs written");
+    for (int i=0; i<PAGE_SIZE; i++) {
+        if (page_buffer[i] != (i & 0xff)) {
+            METAL_ASSERT(page_buffer[i] == (i & 0xff));
+        }
+    }
+    METAL_EXIT_CRITICAL();
+}
+
+
 int main(void)
 {
     uint32_t retcode;
@@ -242,6 +269,7 @@ int main(void)
     METAL_CALL(test_1st_page_free, "Test 1st page marked free");
     METAL_CALL(test_block_marking, "Test marking a block bad");
     METAL_CALL(test_program, "Test program and copy page operations");
+    METAL_CALL(test_quad_read_cache, "Test quad read from cache");
 
     am_hal_gpio_output_clear(AM_BSP_GPIO_LED0);
     return METAL_REPORT();
