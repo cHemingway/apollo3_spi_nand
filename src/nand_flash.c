@@ -81,7 +81,8 @@
 const uint32_t POLL_DELAY_US =                    10;
 
 
-#define DMA_TCB_SIZE      32
+// Size chosen to fit in _nand_cmd_read_quadio comfortably
+#define DMA_TCB_SIZE      64
 uint32_t  g_TCB[DMA_TCB_SIZE];    // Transfer Control Buffer, used for Command Queue ops
 
 #ifdef MICRON_MT29F8G01AD
