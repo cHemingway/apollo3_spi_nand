@@ -701,7 +701,7 @@ uint32_t _nand_cmd_read_x4(uint16_t column_addr, uint32_t *data, uint32_t data_l
 
 /* 
  * Execute READ FROM CACHE Quad I/O to read single page into Cache
- * FIXME: Not currently working, as CS goes high in between! Turnaround not working?
+ * FIXME: Does not seem to be respecting _turnaround_ setting?
  */
 uint32_t _nand_cmd_read_quadio(uint16_t column_addr, uint8_t *data, uint32_t data_len) {
     uint32_t ui32Status;
