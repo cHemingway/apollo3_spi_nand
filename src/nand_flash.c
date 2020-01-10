@@ -154,27 +154,12 @@ uint32_t am_device_command_write(uint32_t ui32Module, uint8_t ui8Instr, bool bSe
     g_PIOTransaction.bContinue          = false;
 #endif // A3DS-25
 
-    if (AM_HAL_MSPI_FLASH_QUADPAIRED == g_psMSPISettings.eDeviceConfig)
-    {
-        g_PIOTransaction.bQuadCmd         = true;
-    }
-    else
-    {
         g_PIOTransaction.bQuadCmd         = false;
-    }
-
     g_PIOTransaction.pui32Buffer        = pData;
-
-#if defined (MSPI_XIPMIXED)
-    am_hal_mspi_dev_config_t mode = am_devices_mspi_flash_mode_switch(ui32Module, &SerialCE0MSPIConfig);
-#endif
 
     // Execute the transction over MSPI.
     ui32Status = am_hal_mspi_blocking_transfer(g_pMSPIHandle, &g_PIOTransaction,
                                          AM_DEVICES_MSPI_FLASH_TIMEOUT);
-#if defined (MSPI_XIPMIXED)
-    am_devices_mspi_flash_mode_switch(ui32Module, &mode);
-#endif
 
     return ui32Status;
 }
@@ -200,30 +185,14 @@ uint32_t am_device_command_read(uint32_t ui32Module, uint8_t ui8Instr, bool bSen
 #if 0 // A3DS-25 Deprecate MSPI CONT
     g_PIOTransaction.bContinue          = false;
 #endif // A3DS-25
-
-    if (AM_HAL_MSPI_FLASH_QUADPAIRED == g_psMSPISettings.eDeviceConfig)
-    {
-        g_PIOTransaction.ui32NumBytes     = ui32NumBytes * 2;
-        g_PIOTransaction.bQuadCmd      = true;
-    }
-    else
-    {
         g_PIOTransaction.ui32NumBytes     = ui32NumBytes;
         g_PIOTransaction.bQuadCmd      = false;
-    }
 
     g_PIOTransaction.pui32Buffer        = pData;
-
-#if defined (MSPI_XIPMIXED)
-    am_hal_mspi_dev_config_t mode = am_devices_mspi_flash_mode_switch(AM_DEVICES_MSPI_FLASH_MSPI_INSTANCE, &SerialCE0MSPIConfig);
-#endif
 
     // Execute the transction over MSPI.
     ui32Status = am_hal_mspi_blocking_transfer(g_pMSPIHandle, &g_PIOTransaction,
                                          AM_DEVICES_MSPI_FLASH_TIMEOUT);
-#if defined (MSPI_XIPMIXED)
-    am_devices_mspi_flash_mode_switch(AM_DEVICES_MSPI_FLASH_MSPI_INSTANCE, &mode);
-#endif
 
     return ui32Status;
 }
