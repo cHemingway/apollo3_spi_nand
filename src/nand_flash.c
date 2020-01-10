@@ -50,6 +50,7 @@
 #include "am_util_stdio.h"
 #include "am_util_delay.h"
 #include "am_bsp.h"
+#include "am_bsp_pins.h"
 
 // Include direct regs for raw command queue pokery
 #include "core_cm4.h"
@@ -66,6 +67,9 @@
 // Disable warning for unused functions in this file
 #pragma GCC diagnostic ignored "-Wunused-function"
 
+
+// Hack, use GPIO for CE
+#define USE_GPIO_CE 1
 
 // Timeout for MSPI HAL read/write acesses in microseconds
 // Set to 10mS as flash should respond immediately
@@ -136,6 +140,21 @@ uint32_t nand_init_device(void);
 // Convert a block number into a block/page address
 static inline uint32_t block_to_page_addr(uint32_t block_addr) {
     return block_addr << LOG2_PPB;
+}
+
+
+
+
+// ISR Handler for MSPI peripheral. Calls back into HAL, same as others
+// Don't use g_MSPIInterruptStatus, register callbacks with HAL
+volatile uint32_t g_MSPIInterruptStatus;
+void MSPI_IRQHandler(void)
+{
+    uint32_t      ui32Status;
+    am_hal_mspi_interrupt_status_get(g_pMSPIHandle, &ui32Status, false);
+    am_hal_mspi_interrupt_clear(g_pMSPIHandle, ui32Status);
+    am_hal_mspi_interrupt_service(g_pMSPIHandle, ui32Status);
+    g_MSPIInterruptStatus &= ~ui32Status;
 }
 
 
@@ -808,7 +827,25 @@ uint32_t _nand_cmd_read_quadio(uint16_t column_addr, uint32_t *data, uint32_t da
     raw_cq.pfnCallback = dma_complete_callback; // Hit this callback when done
     raw_cq.pCallbackCtxt = NULL;                // No data for callback
     // I think JmpAddr is for loop back? Leaving NULL for now
-    raw_cq.pJmpAddr = NULL;                     
+    raw_cq.pJmpAddr = NULL;
+
+    #if USE_GPIO_CE
+    // Hack: Reconfig CS as GPIO and config
+    // Make constant of form AM_HAL_PIN_xx_GPIO
+    #define ADD_GPIO(x)   AM_HAL_PIN_ ## x ## _GPIO
+    #define CE_FUNC_GPIO(x) ADD_GPIO(x)
+
+    am_hal_gpio_pincfg_t cs_cfg = g_AM_BSP_GPIO_MSPI_CE0;
+    cs_cfg.uFuncSel = CE_FUNC_GPIO(AM_BSP_GPIO_MSPI_CE0);
+    cs_cfg.eGPOutcfg = AM_HAL_GPIO_PIN_OUTCFG_PUSHPULL;
+
+    #undef ADD_GPIO
+    #undef CE_FUNC_GPIO
+
+    #endif
+
+    am_hal_gpio_pinconfig(AM_BSP_GPIO_MSPI_CE0, cs_cfg);
+    am_hal_gpio_output_clear(AM_BSP_GPIO_MSPI_CE0);
 
     ui32Status = am_hal_mspi_control(g_pMSPIHandle, AM_HAL_MSPI_REQ_CQ_RAW, &raw_cq);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
@@ -820,6 +857,13 @@ uint32_t _nand_cmd_read_quadio(uint16_t column_addr, uint32_t *data, uint32_t da
         }
         am_util_delay_us(1);
     }
+
+    #if USE_GPIO_CE
+    // Hack: Manually raise CS, as 
+    am_hal_gpio_output_set(AM_BSP_GPIO_MSPI_CE0);
+    am_util_delay_us(100);
+    am_hal_gpio_pinconfig(AM_BSP_GPIO_MSPI_CE0, g_AM_BSP_GPIO_MSPI_CE0);
+    #endif
 
     // Todo, check if error occured in queue?
 
