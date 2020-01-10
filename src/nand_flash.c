@@ -106,7 +106,7 @@ am_hal_mspi_dev_config_t  g_psMSPISettings =
     // TODO: These are for use with DMA, check if OK
     .ui8ReadInstr         = CMD_READ_CACHE_SINGLE,      
     .ui8WriteInstr        = CMD_PROGRAM_LOAD_RANDOM,
-    .ui32TCBSize          = DMA_TCB_SIZE,                   // DMA Transfer Control Buffer
+    .ui32TCBSize          = DMA_TCB_SIZE,                   // Command queue buffer
     .pTCB                 = g_TCB,
     .scramblingStartAddr  = 0,                              // No data scrambling
     .scramblingEndAddr    = 0,
@@ -767,6 +767,16 @@ uint32_t _nand_cmd_read_quadio(uint16_t column_addr, uint8_t *data, uint32_t dat
             {.address = (uint32_t)&(MSPI->DMADEVADDR),
              .value = (uint32_t)&(MSPI->RXFIFO)
             },
+            // DMA trigger threshold, FIFO half full
+            {
+             .address = (uint32_t)&(MSPI->DMATHRESH),
+             .value = 8
+            },
+            // DMA burst size, 32 bytes = 8 words, empty FIFO
+            {
+             .address = (uint32_t)&(MSPI->DMABCOUNT),
+             .value = 32
+            },
             // Config reg
             {.address = (uint32_t)&(MSPI->CFG),
              .value =  
@@ -777,7 +787,7 @@ uint32_t _nand_cmd_read_quadio(uint16_t column_addr, uint8_t *data, uint32_t dat
             },
             // Write to control register. Don't start, as DMA will
             // We will overwrite the XFERBYTES part here later
-            [8]{.address = (uint32_t)&(MSPI->CTRL),
+            [10]{.address = (uint32_t)&(MSPI->CTRL),
              .value = _VAL2FLD(MSPI_CTRL_XFERBYTES, 0) |
                       // RX Transaction
                       _VAL2FLD(MSPI_CTRL_TXRX, AM_HAL_MSPI_RX) |
@@ -818,8 +828,8 @@ uint32_t _nand_cmd_read_quadio(uint16_t column_addr, uint8_t *data, uint32_t dat
     
     // Override data address and length
     command_queue[4].value = (uint32_t)data;
-    command_queue[5].value = (uint32_t)data_len;
-    command_queue[8].value |= _VAL2FLD(MSPI_CTRL_XFERBYTES, data_len);
+    command_queue[5].value = (uint32_t)data_len;    // Size of DMA, in bytes
+    command_queue[10].value |= _VAL2FLD(MSPI_CTRL_XFERBYTES, data_len);
 
     // Setup queue wrapper struct
     raw_cq.ui32PauseCondition = 0;  // Pre transaction, no pause.
