@@ -51,6 +51,10 @@
 #include "am_util_delay.h"
 #include "am_bsp.h"
 
+// Include direct regs for raw command queue pokery
+#include "core_cm4.h"
+#include "apollo3.h"
+
 #ifdef MICRON_MT29F8G01AD
 #include "mt79f_cmd_regs.h"           // Command and register values, page size
 #endif
@@ -71,6 +75,10 @@
  // Should be ~10x larger than execution time to ensure 90% accurate timing.
  // HAL has ~1uS delay minimum (due to polling loop), so 10uS sounds good
 const uint32_t POLL_DELAY_US =                    10;
+
+
+#define DMA_TCB_SIZE      32
+uint32_t  g_TCB[DMA_TCB_SIZE];    // Transfer Control Buffer, used for Command Queue ops
 
 #ifdef MICRON_MT29F8G01AD
 
@@ -93,8 +101,8 @@ am_hal_mspi_dev_config_t  g_psMSPISettings =
     // TODO: These are for use with DMA, check if OK
     .ui8ReadInstr         = CMD_READ_CACHE_SINGLE,      
     .ui8WriteInstr        = CMD_PROGRAM_LOAD_RANDOM,
-    .ui32TCBSize          = 0,                              // No DMA Transfer Control Buffer
-    .pTCB                 = NULL,
+    .ui32TCBSize          = DMA_TCB_SIZE,                   // DMA Transfer Control Buffer
+    .pTCB                 = g_TCB,
     .scramblingStartAddr  = 0,                              // No data scrambling
     .scramblingEndAddr    = 0,
 };
@@ -131,6 +139,15 @@ static inline uint32_t block_to_page_addr(uint32_t block_addr) {
 }
 
 
+// DMA Complete
+volatile bool g_dma_complete;
+void dma_complete_callback(void *pCallbackCtxt, uint32_t status)
+{
+    // Set the DMA complete flag.
+    g_dma_complete = true;
+}
+
+
 //*****************************************************************************
 //
 // Generic Command Write function.
@@ -154,7 +171,7 @@ uint32_t am_device_command_write(uint32_t ui32Module, uint8_t ui8Instr, bool bSe
     g_PIOTransaction.bContinue          = false;
 #endif // A3DS-25
 
-        g_PIOTransaction.bQuadCmd         = false;
+    g_PIOTransaction.bQuadCmd         = false;
     g_PIOTransaction.pui32Buffer        = pData;
 
     // Execute the transction over MSPI.
@@ -185,8 +202,8 @@ uint32_t am_device_command_read(uint32_t ui32Module, uint8_t ui8Instr, bool bSen
 #if 0 // A3DS-25 Deprecate MSPI CONT
     g_PIOTransaction.bContinue          = false;
 #endif // A3DS-25
-        g_PIOTransaction.ui32NumBytes     = ui32NumBytes;
-        g_PIOTransaction.bQuadCmd      = false;
+    g_PIOTransaction.ui32NumBytes     = ui32NumBytes;
+    g_PIOTransaction.bQuadCmd      = false;
 
     g_PIOTransaction.pui32Buffer        = pData;
 
@@ -652,6 +669,7 @@ uint32_t _nand_cmd_read_x4(uint16_t column_addr, uint32_t *data, uint32_t data_l
     // Execute the transction over MSPI.
     ui32Status = am_hal_mspi_blocking_transfer(g_pMSPIHandle, &g_PIOTransaction,
                                          AM_DEVICES_MSPI_FLASH_TIMEOUT);
+    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
     // Change back to SPI mode
     ui32Status = mspi_set_use_quadspi(false);
@@ -663,40 +681,147 @@ uint32_t _nand_cmd_read_x4(uint16_t column_addr, uint32_t *data, uint32_t data_l
 
 /* 
  * Execute READ FROM CACHE Quad I/O to read single page into Cache
- * FIXME: Not currently working! Instr is sent as Quad, not SPI as it should be
+ * FIXME: Not currently working, as CS goes high in between! Turnaround not working?
  */
 uint32_t _nand_cmd_read_quadio(uint16_t column_addr, uint32_t *data, uint32_t data_len) {
     uint32_t ui32Status;
 
-    // Change to 2 byte addresses
-    MSPI->CFG_b.ASIZE = 0x01;   // Address is 2 bytes
+    am_hal_mspi_cq_raw_t raw_cq;
 
-    // 4 Turnaround cycles
-    MSPI->CFG_b.TURNAROUND = 4;
+    // Command queue, format register, value. Processed sequentially and automatically in hw
+    am_hal_cmdq_entry_t command_queue[] = {
+        // Transaction one, address + data
+            // Set address, must be position 0 as overwritten
+            [0]{.address = (uint32_t)&(MSPI->ADDR),
+                .value = 0xDEAD
+            },
+            // Set instruction
+            {.address = (uint32_t)&(MSPI->INSTR),
+             .value = CMD_READ_CACHE_X4
+            },
+            // Config, single width
+            {.address = (uint32_t)&(MSPI->CFG),
+             .value =  
+                      // SPI Mode 0. TODO: Take from config
+                      _VAL2FLD(MSPI_CFG_CPOL, 0)    | 
+                      _VAL2FLD(MSPI_CFG_CPHA, 0)    |
+                      // Turnaround is 8 cycles. TODO: Take from config
+                      _VAL2FLD(MSPI_CFG_TURNAROUND, 8)    |
+                      // Set instruction and address size
+                      _VAL2FLD(MSPI_CFG_ISIZE, AM_HAL_MSPI_INSTR_1_BYTE)  |
+                      _VAL2FLD(MSPI_CFG_ASIZE, AM_HAL_MSPI_ADDR_2_BYTE)   |
+                      // Set device config. TODO: Make configurable
+                      // Here we make this SPI, pin 0, as _this_ part is 1 bit wide
+                      _VAL2FLD(MSPI_CFG_DEVCFG, MSPI_CFG_DEVCFG_SERIAL0)
+            },
+            // Write to control register with start bit set to kick this off
+            {.address = (uint32_t)&(MSPI->CTRL),
+             .value = _VAL2FLD(MSPI_CTRL_XFERBYTES, 0) |
+                      // TX transaction, so we get TX->RX CFG_TURNAROUND
+                      _VAL2FLD(MSPI_CTRL_TXRX, AM_HAL_MSPI_TX) |
+                      // Send instruction and address
+                      _VAL2FLD(MSPI_CTRL_SENDI, 1) |
+                      _VAL2FLD(MSPI_CTRL_SENDA, 1) |
+                      // Enable turnaround cycles
+                      _VAL2FLD(MSPI_CTRL_ENTURN, 1) |
+                      // Default little endian
+                      _VAL2FLD(MSPI_CTRL_BIGENDIAN, 0) |
+                      _VAL2FLD(MSPI_CTRL_START, 1)
+             },
+        // Section 2, QUAD with no instruction or address, just data
+        // We use the DMA peripheral here as well, but _not_ with DMAEN_AUTO
+        // as DMAEN_AUTO would mean the DMA would attempt to send instruction/address
+        // See Datasheet 7.4 DMA Operations.
+        // FIXME: CS goes high in between!
 
-    // Change to Quad mode
-    ui32Status = mspi_set_use_quadspi(true);
+            // Data address for DMA to transfer _to_.  Overwritten later
+            [4]{.address = (uint32_t)&(MSPI->DMATARGADDR),
+                .value = 0
+            },
+            // Number of _bytes_ to DMA. Overwritten later
+            [5]{.address = (uint32_t)&(MSPI->DMATOTCOUNT),
+                .value = 0
+            },
+            // Device register to DMA _from_. As we are recieving, use RX FIFO
+            // FIXME: Should this be external address? We are not sending address?
+            {.address = (uint32_t)&(MSPI->DMADEVADDR),
+             .value = (uint32_t)&(MSPI->RXFIFO)
+            },
+            // Config reg
+            {.address = (uint32_t)&(MSPI->CFG),
+             .value =  
+                      // Turnaround is 8 cycles. TODO: Take from config
+                      _VAL2FLD(MSPI_CFG_TURNAROUND, 8)    |
+                      // Set to QUAD mode
+                      _VAL2FLD(MSPI_CFG_DEVCFG, MSPI_CFG_DEVCFG_QUAD0)
+            },
+            // Write to control register. Don't start, as DMA will
+            // We will overwrite the XFERBYTES part here later
+            [8]{.address = (uint32_t)&(MSPI->CTRL),
+             .value = _VAL2FLD(MSPI_CTRL_XFERBYTES, 0) |
+                      // RX Transaction
+                      _VAL2FLD(MSPI_CTRL_TXRX, AM_HAL_MSPI_RX) |
+                      // Send instruction and address
+                      _VAL2FLD(MSPI_CTRL_SENDI, 0) |
+                      _VAL2FLD(MSPI_CTRL_SENDA, 0) |
+                      // Enable turnaround cycles
+                      _VAL2FLD(MSPI_CTRL_ENTURN, 1) |
+                      // Default little endian
+                      _VAL2FLD(MSPI_CTRL_BIGENDIAN, 0) |
+                      // Don't start, as DMA will
+                      _VAL2FLD(MSPI_CTRL_START, 0)
+             },
+             // Setup DMA Flash register, disable instr/data, enable turnaround
+             {.address = (uint32_t)&(MSPI->FLASH),
+              .value = // Don't send instruction or address in DMA transaction
+                       _VAL2FLD(MSPI_FLASH_XIPSENDI, 0) |
+                       _VAL2FLD(MSPI_FLASH_XIPSENDA, 0) |
+                       // Enable turnaround cycles in DMA operations
+                       _VAL2FLD(MSPI_FLASH_XIPENTURN, 1)
+             },
+             // Configure DMA, starting DMA transfer from started peripheral
+             {.address = (uint32_t)&(MSPI->DMACFG),
+                       // Disable power off after complete, HAL claims is not supported?
+              .value = _VAL2FLD(MSPI_DMACFG_DMAPWROFF, 0) |
+                       // Set low priority, as peripheral should pause SCLK on overflow?
+                       _VAL2FLD(MSPI_DMACFG_DMAPRI, 0)    |
+                       // Direction is peripheral -> memory
+                       _VAL2FLD(MSPI_DMACFG_DMADIR, MSPI_DMACFG_DMADIR_P2M) |
+                       // We set auto dir
+                       _VAL2FLD(MSPI_DMACFG_DMAEN, MSPI_DMACFG_DMAEN_EN)
+             }
+
+    };
+
+    // Override column address, first position in queue
+    command_queue[0].value = (uint32_t)column_addr;
+    
+    // Override data address and length
+    command_queue[4].value = (uint32_t)data;
+    command_queue[5].value = (uint32_t)data_len;
+    command_queue[8].value |= _VAL2FLD(MSPI_CTRL_XFERBYTES, data_len);
+
+    // Setup queue wrapper struct
+    raw_cq.ui32PauseCondition = 0;  // Pre transaction, no pause.
+    raw_cq.pCQEntry = command_queue;        // Queue
+    raw_cq.numEntries = sizeof(command_queue) / sizeof(command_queue[0]);
+    raw_cq.pfnCallback = dma_complete_callback; // Hit this callback when done
+    raw_cq.pCallbackCtxt = NULL;                // No data for callback
+    // I think JmpAddr is for loop back? Leaving NULL for now
+    raw_cq.pJmpAddr = NULL;                     
+
+    ui32Status = am_hal_mspi_control(g_pMSPIHandle, AM_HAL_MSPI_REQ_CQ_RAW, &raw_cq);
     if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
 
-    // Create the individual write transaction.
-    g_PIOTransaction.eDirection         = AM_HAL_MSPI_RX;
-    g_PIOTransaction.bSendAddr          = true;
-    g_PIOTransaction.ui32DeviceAddr     = column_addr;
-    g_PIOTransaction.bSendInstr         = true;
-    g_PIOTransaction.ui16DeviceInstr    = CMD_READ_CACHE_QUADIO;
-    g_PIOTransaction.bTurnaround        = true;
-    g_PIOTransaction.ui32NumBytes       = data_len;
-    g_PIOTransaction.bQuadCmd           = false;    // Command is _not_ quad, only address + data
+    // FIXME: Hits an interrupt here?
+    for (uint32_t i=0; i<AM_DEVICES_MSPI_FLASH_TIMEOUT; i++) {
+        if (g_dma_complete) {
+            break;
+        }
+        am_util_delay_us(1);
+    }
 
-    g_PIOTransaction.pui32Buffer        = data;
-
-    // Execute the transction over MSPI.
-    ui32Status = am_hal_mspi_blocking_transfer(g_pMSPIHandle, &g_PIOTransaction,
-                                         AM_DEVICES_MSPI_FLASH_TIMEOUT);
-
-    // Change back to SPI mode
-    ui32Status = mspi_set_use_quadspi(false);
-    if (ui32Status != AM_HAL_STATUS_SUCCESS) return ui32Status;
+    // Todo, check if error occured in queue?
 
     return ui32Status;
 }
