@@ -4,6 +4,7 @@
 
 #include <stdio.h> // For printf, will pick up _write() in SEGGER_RTT_Syscalls_GCC.c
 #include <string.h> // memcmp
+#include <stdlib.h> // srand, rand
 
 #include "am_mcu_apollo.h"
 #include "am_bsp.h"
@@ -49,7 +50,7 @@ void seq_assert(unsigned int seed, const uint8_t *buf, size_t length)
 		const uint8_t expect = rand();
 
 		if (buf[i] != expect) {
-			fprintf(stderr, "seq_assert: mismatch at %ld in "
+			fprintf(stderr, "seq_assert: mismatch at %d in "
 				"sequence %d: 0x%02x (expected 0x%02x)\n",
 				i, seed, buf[i], expect);
 			while(1); // Changed from abort()
@@ -91,7 +92,7 @@ int main(void)
         printf("Map init\n");
         dhara_map_init(&map, &dhara_adaptor_nand, dhara_page_buf, GC_RATIO);
         dhara_map_resume(&map, NULL);
-        printf("  capacity: %d\n", dhara_map_capacity(&map));
+        printf("  capacity: %ld\n", dhara_map_capacity(&map));
         printf("\n");
 
         printf("Writing %u sectors \n", test_sectors);
@@ -99,7 +100,7 @@ int main(void)
             seq_gen(i, dhara_test_buf, PAGE_SIZE);
             if (dhara_map_write(&map, i, dhara_test_buf, &dhara_err) < 0) {
 		        printf("map_write error: %s \n", dhara_strerror(dhara_err));
-                return; // TODO exit()
+                return 1; // TODO exit()
             }
         }
 
@@ -114,15 +115,15 @@ int main(void)
         if (retcode) {
             printf("dhara_map_resume error %s \n",dhara_strerror(dhara_err));
         }
-        printf("  capacity: %d\n", dhara_map_capacity(&map));
-	    printf("  use count: %d\n", dhara_map_size(&map));
+        printf("  capacity: %ld\n", dhara_map_capacity(&map));
+	    printf("  use count: %ld\n", dhara_map_size(&map));
 
         printf("Read back...\n");
 	    for (int i = 0; i < test_sectors; i++) {
 		    
             if(dhara_map_read(&map, i, dhara_test_buf, &dhara_err)) {
                 printf("map_read error: %s \n", dhara_strerror(dhara_err));
-                return; // TODO exit()
+                return 1; // TODO exit()
             }
 		    seq_assert(i, dhara_test_buf, PAGE_SIZE);
         }
